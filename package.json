@@ -1,0 +1,22 @@
+{
+  "name": "vsql",
+  "version": "1.0.0",
+  "description": "High-performance MySQL/MariaDB database resource for FiveM",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "build": "node build.js && npm run types",
+    "watch": "node build.js --watch",
+    "types": "tsc --emitDeclarationOnly",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "mysql2": "^3.11.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "esbuild": "^0.23.1",
+    "typescript": "^5.5.4"
+  }
+}

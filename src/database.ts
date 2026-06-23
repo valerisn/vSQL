@@ -1,0 +1,296 @@
+import { performance } from 'perf_hooks';
+import mysql, { Pool, PoolConnection } from 'mysql2/promise';
+import { config } from './config';
+import { logger } from './logger';
+import { bindParams, Params } from './params';
+import { ResultCache } from './cache';
+import { Profiler } from './profiler';
+import { detectServer, ServerInfo } from './server';
+import { backoff, isReadQuery, preview, sleep } from './util';
+
+type Mode = 'query' | 'execute';
+
+// A queryable target: either the pool itself or a single connection (used for
+// transactions so every statement runs on the same connection).
+type Queryable = Pick<Pool, 'query' | 'execute'>;
+
+export interface TransactionApi {
+  query(sql: string, params?: Params): Promise<any>;
+  execute(sql: string, params?: Params): Promise<any>;
+  single(sql: string, params?: Params): Promise<any>;
+  scalar(sql: string, params?: Params): Promise<any>;
+  insert(sql: string, params?: Params): Promise<number>;
+  update(sql: string, params?: Params): Promise<number>;
+}
+
+type TransactionQuery = string | [string, Params] | { query?: string; sql?: string; values?: Params; params?: Params };
+
+class Database {
+  private pool: Pool | null = null;
+  private ready = false;
+  private waiters: Array<() => void> = [];
+
+  server: ServerInfo = { type: 'unknown', version: '', major: 0, minor: 0, supportsReturning: false };
+  cache = new ResultCache();
+  profiler = new Profiler();
+
+  get isConnected(): boolean {
+    return this.ready;
+  }
+
+  async start(): Promise<void> {
+    this.cache.configure(config.cacheEnabled, config.cacheSize, config.cacheTtl);
+
+    let attempt = 0;
+    while (!this.ready) {
+      attempt++;
+      try {
+        this.pool = mysql.createPool(config.poolOptions());
+        this.pool.on('connection', (conn) => this.tuneConnection(conn));
+
+        const conn = await this.pool.getConnection();
+        try {
+          this.server = await detectServer(conn, config.serverHint);
+        } finally {
+          conn.release();
+        }
+
+        this.ready = true;
+        const target = config.base.socketPath
+          ? config.base.socketPath
+          : `${config.base.host}:${config.base.port}/${config.base.database}`;
+        logger.info(
+          `connected to ${this.server.type} ${this.server.version || '(unknown version)'} @ ${target} ` +
+            `(pool: ${config.poolSize}${this.server.supportsReturning ? ', RETURNING enabled' : ''})`
+        );
+        this.flushWaiters();
+      } catch (err: any) {
+        if (this.pool) {
+          try {
+            await this.pool.end();
+          } catch {
+            /* ignore */
+          }
+          this.pool = null;
+        }
+        const delay = backoff(attempt);
+        logger.error(
+          `connection attempt ${attempt} failed: ${err.message}. retrying in ${(delay / 1000).toFixed(1)}s`
+        );
+        await sleep(delay);
+      }
+    }
+  }
+
+  // Resolves immediately once connected, otherwise queues the caller so queries
+  // issued during startup (or a reconnect) wait instead of throwing.
+  whenReady(): Promise<void> {
+    if (this.ready) return Promise.resolve();
+    return new Promise((resolve) => this.waiters.push(resolve));
+  }
+
+  private flushWaiters(): void {
+    const pending = this.waiters;
+    this.waiters = [];
+    for (const resolve of pending) resolve();
+  }
+
+  private tuneConnection(conn: any): void {
+    for (const stmt of config.sessionStatements(this.server)) {
+      conn.query(stmt, (err: any) => {
+        if (err) logger.debug(`session setup failed (${stmt}): ${err.message}`);
+      });
+    }
+  }
+
+  private async exec(sql: string, params: Params, mode: Mode, target?: Queryable): Promise<{ rows: any }> {
+    if (!this.pool) throw new Error('vSQL: pool is not initialized');
+    const bound = bindParams(sql, params);
+    const runner = target ?? this.pool;
+    const start = performance.now();
+    try {
+      const [rows] =
+        mode === 'execute'
+          ? await runner.execute(bound.sql, bound.values)
+          : await runner.query(bound.sql, bound.values);
+      const ms = performance.now() - start;
+      this.profiler.record(sql, ms);
+      logger.query(bound.sql, bound.values, ms);
+      if (ms >= config.slowQueryMs) {
+        logger.warn(`slow query ${ms.toFixed(1)}ms: ${preview(sql)}`);
+      }
+      return { rows };
+    } catch (err: any) {
+      this.profiler.recordError();
+      logger.error(`query failed: ${err.message}\n        sql: ${preview(sql)}`);
+      throw err;
+    }
+  }
+
+  private async read(sql: string, params: Params, mode: Mode, shape: (rows: any) => any): Promise<any> {
+    const cacheable = this.cache.enabled && isReadQuery(sql);
+    const key = cacheable ? this.cache.key(sql, params) : '';
+    if (cacheable) {
+      const hit = this.cache.get(key);
+      if (hit !== undefined) {
+        this.profiler.recordCacheHit();
+        return hit;
+      }
+    }
+    const { rows } = await this.exec(sql, params, mode);
+    const shaped = shape(rows);
+    if (cacheable) this.cache.set(key, shaped);
+    return shaped;
+  }
+
+  // Any write clears the result cache. It's blunt but always correct; finer
+  // invalidation is available via the cacheClear export with a table substring.
+  private invalidate(): void {
+    if (this.cache.enabled) this.cache.clear();
+  }
+
+  // --- public query API ---------------------------------------------------
+
+  async query(sql: string, params?: Params): Promise<any> {
+    if (isReadQuery(sql)) return this.read(sql, params, 'query', (rows) => rows);
+    const { rows } = await this.exec(sql, params, 'query');
+    this.invalidate();
+    return rows;
+  }
+
+  async execute(sql: string, params?: Params): Promise<any> {
+    if (isReadQuery(sql)) return this.read(sql, params, 'execute', (rows) => rows);
+    const { rows } = await this.exec(sql, params, 'execute');
+    this.invalidate();
+    return rows;
+  }
+
+  single(sql: string, params?: Params): Promise<any> {
+    return this.read(sql, params, 'execute', (rows) => (Array.isArray(rows) ? rows[0] ?? null : null));
+  }
+
+  scalar(sql: string, params?: Params): Promise<any> {
+    return this.read(sql, params, 'execute', (rows) => {
+      const row = Array.isArray(rows) ? rows[0] : undefined;
+      if (!row) return null;
+      const values = Object.values(row);
+      return values.length ? values[0] : null;
+    });
+  }
+
+  async insert(sql: string, params?: Params): Promise<number> {
+    const { rows } = await this.exec(sql, params, 'execute');
+    this.invalidate();
+    return (rows as any)?.insertId ?? 0;
+  }
+
+  async update(sql: string, params?: Params): Promise<number> {
+    const { rows } = await this.exec(sql, params, 'execute');
+    this.invalidate();
+    return (rows as any)?.affectedRows ?? 0;
+  }
+
+  // Batch-aware prepared execution: an array of arrays runs the same statement
+  // once per row inside a transaction; otherwise it's a single execute.
+  async prepare(sql: string, params?: Params): Promise<any> {
+    if (Array.isArray(params) && params.length > 0 && params.every((p) => Array.isArray(p))) {
+      return this.batch(sql, params as any[][]);
+    }
+    if (isReadQuery(sql)) return this.read(sql, params, 'execute', (rows) => rows);
+    const { rows } = await this.exec(sql, params, 'execute');
+    this.invalidate();
+    const header = rows as any;
+    return header?.affectedRows ?? header?.insertId ?? rows;
+  }
+
+  async batch(sql: string, rows: any[][]): Promise<number> {
+    if (!Array.isArray(rows) || rows.length === 0) return 0;
+    if (!this.pool) throw new Error('vSQL: pool is not initialized');
+    const conn = await this.pool.getConnection();
+    let affected = 0;
+    try {
+      await conn.beginTransaction();
+      for (const row of rows) {
+        const bound = bindParams(sql, row);
+        const [res] = await conn.execute(bound.sql, bound.values);
+        affected += (res as any)?.affectedRows ?? 0;
+      }
+      await conn.commit();
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
+    this.invalidate();
+    return affected;
+  }
+
+  async transaction(arg: TransactionQuery[] | ((tx: TransactionApi) => Promise<any>)): Promise<any> {
+    if (!this.pool) throw new Error('vSQL: pool is not initialized');
+    const conn = await this.pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      let result: any;
+      if (typeof arg === 'function') {
+        result = await arg(this.txApi(conn));
+      } else if (Array.isArray(arg)) {
+        result = [];
+        for (const entry of arg) {
+          const [sql, params] = normalizeEntry(entry);
+          const { rows } = await this.exec(sql, params, 'execute', conn);
+          result.push(rows);
+        }
+      } else {
+        throw new Error('vSQL: transaction expects an array of queries or a callback');
+      }
+      await conn.commit();
+      this.invalidate();
+      return result ?? true;
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
+  }
+
+  private txApi(conn: PoolConnection): TransactionApi {
+    const exec = (sql: string, params: Params, shape: (r: any) => any) =>
+      this.exec(sql, params, 'execute', conn).then(({ rows }) => shape(rows));
+    return {
+      query: (sql, params) => this.exec(sql, params, 'query', conn).then(({ rows }) => rows),
+      execute: (sql, params) => exec(sql, params, (r) => r),
+      single: (sql, params) => exec(sql, params, (r) => (Array.isArray(r) ? r[0] ?? null : null)),
+      scalar: (sql, params) =>
+        exec(sql, params, (r) => {
+          const row = Array.isArray(r) ? r[0] : undefined;
+          return row ? Object.values(row)[0] ?? null : null;
+        }),
+      insert: (sql, params) => exec(sql, params, (r) => r?.insertId ?? 0),
+      update: (sql, params) => exec(sql, params, (r) => r?.affectedRows ?? 0)
+    };
+  }
+
+  async shutdown(): Promise<void> {
+    this.ready = false;
+    if (!this.pool) return;
+    logger.info('draining connection pool...');
+    try {
+      await this.pool.end();
+    } catch (err: any) {
+      logger.debug(`pool drain error: ${err.message}`);
+    }
+    this.pool = null;
+  }
+}
+
+function normalizeEntry(entry: TransactionQuery): [string, Params] {
+  if (typeof entry === 'string') return [entry, undefined];
+  if (Array.isArray(entry)) return [entry[0], entry[1]];
+  const sql = entry.query ?? entry.sql;
+  if (!sql) throw new Error('vSQL: transaction query entry is missing a "query" string');
+  return [sql, entry.values ?? entry.params];
+}
+
+export const db = new Database();
