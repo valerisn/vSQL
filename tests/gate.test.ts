@@ -53,6 +53,23 @@ test('closing re-queues new callers until the next open', async () => {
   assert.equal(resolved, true);
 });
 
+test('fail rejects everyone currently waiting and the gate stays closed', async () => {
+  const g = new ReadyGate();
+  const a = g.whenReady();
+  const b = g.whenReady();
+  g.fail(new Error('database unavailable'));
+  await assert.rejects(a, /database unavailable/);
+  await assert.rejects(b, /database unavailable/);
+  assert.equal(g.isReady, false);
+
+  // A later caller queues again and can still be released by open().
+  let resolved = false;
+  const c = g.whenReady().then(() => (resolved = true));
+  g.open();
+  await c;
+  assert.equal(resolved, true);
+});
+
 test('open is idempotent and does not double-release a waiter', async () => {
   const g = new ReadyGate();
   let count = 0;

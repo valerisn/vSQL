@@ -63,8 +63,9 @@ function showDebug(): void {
   const h = db.health();
   const s = db.stats();
   const state = h.connected ? `${C.green}connected` : h.reconnecting ? `${C.yellow}reconnecting` : `${C.red}down`;
+  const breaker = h.breaker === 'open' ? ` ${C.red}(breaker open)${C.reset}` : h.breaker === 'half-open' ? ` ${C.yellow}(breaker half-open)${C.reset}` : '';
   logger.raw(`${C.cyan}[vSQL]${C.reset} debug  (v${currentVersion() || '?'})`);
-  logger.raw(`  state       ${state}${C.reset}`);
+  logger.raw(`  state       ${state}${C.reset}${breaker}`);
   logger.raw(`  server      ${db.server.type} ${db.server.version || '?'} (RETURNING ${db.server.supportsReturning ? 'yes' : 'no'})`);
   for (const lineText of config.summary()) logger.raw(`  ${lineText}`);
   logger.raw(`  live cache  ${s.cacheSize} entr${s.cacheSize === 1 ? 'y' : 'ies'}`);

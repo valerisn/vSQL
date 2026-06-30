@@ -41,6 +41,8 @@ export interface Health {
   connected: boolean;
   /** True while a fatal connection loss is being recovered from. */
   reconnecting: boolean;
+  /** Circuit-breaker state: 'closed' (normal), 'open' (fast-failing), or 'half-open'. */
+  breaker: 'closed' | 'open' | 'half-open';
   server: ServerInfo;
 }
 

@@ -21,6 +21,7 @@ import { castValue } from './typecast';
 import { buildDelete, buildInsert, buildSelect, buildUpdate, FindOptions, Where } from './crud';
 import { runAtomic } from './retry';
 import { ReadyGate } from './gate';
+import { CircuitBreaker } from './breaker';
 import {
   backoff,
   connectionHint,
@@ -78,6 +79,8 @@ export interface TransactionApi {
 class Database {
   private pool: Pool | null = null;
   private gate = new ReadyGate();
+  private breaker = new CircuitBreaker();
+  private connectedOnce = false;
   private reconnecting = false;
   private shuttingDown = false;
 
@@ -90,8 +93,13 @@ class Database {
     return this.gate.isReady;
   }
 
-  health(): { connected: boolean; reconnecting: boolean; server: ServerInfo } {
-    return { connected: this.gate.isReady, reconnecting: this.reconnecting, server: this.server };
+  health(): { connected: boolean; reconnecting: boolean; breaker: string; server: ServerInfo } {
+    return {
+      connected: this.gate.isReady,
+      reconnecting: this.reconnecting,
+      breaker: this.breaker.state(),
+      server: this.server
+    };
   }
 
   // Profiler counters plus live cache state and how long the resource has been
@@ -108,6 +116,7 @@ class Database {
   async start(): Promise<void> {
     this.cache.configure(config.cacheEnabled, config.cacheSize, config.cacheTtl);
     this.profiler.configure(config.slowQueryMs);
+    this.breaker.configure(config.breakerThreshold, config.breakerResetMs);
 
     let attempt = 0;
     while (!this.gate.isReady) {
@@ -131,6 +140,8 @@ class Database {
         }
 
         const reconnected = this.reconnecting;
+        this.breaker.onSuccess();
+        this.connectedOnce = true;
         // Open the gate (sets ready + releases queued callers) before announcing,
         // so anything awaiting whenReady() resumes the moment we're connected.
         this.gate.open();
@@ -154,6 +165,13 @@ class Database {
             /* ignore */
           }
           this.pool = null;
+        }
+        this.breaker.onFailure();
+        // Once we've connected before, a prolonged outage trips the breaker: stop
+        // hanging callers and reject anyone already queued with a clear error. The
+        // reconnect loop keeps probing regardless.
+        if (this.connectedOnce && this.breaker.isOpen()) {
+          this.gate.fail(new Error('vSQL: database unavailable (circuit breaker open)'));
         }
         const delay = backoff(attempt);
         logger.error(
@@ -203,8 +221,14 @@ class Database {
   }
 
   // Resolves immediately once connected, otherwise queues the caller so queries
-  // issued during startup (or a reconnect) wait instead of throwing.
+  // issued during startup (or a reconnect) wait instead of throwing. If the
+  // breaker has tripped (a sustained outage after we'd connected before), fail
+  // fast instead of queueing, so dependent resources get a prompt error.
   whenReady(): Promise<void> {
+    if (this.gate.isReady) return Promise.resolve();
+    if (this.connectedOnce && this.breaker.isOpen()) {
+      return Promise.reject(new Error('vSQL: database unavailable (circuit breaker open)'));
+    }
     return this.gate.whenReady();
   }
 

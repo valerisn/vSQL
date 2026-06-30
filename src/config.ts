@@ -46,6 +46,8 @@ class Config {
   debug = 0;
   slowQueryMs = 150;
   txRetries = 2; // extra attempts for a transaction/batch that hits a deadlock
+  breakerThreshold = 10; // consecutive failed reconnects before fast-failing; 0 = off
+  breakerResetMs = 30_000; // how long the breaker stays open before a probe
 
   cacheEnabled = false;
   cacheSize = 500;
@@ -76,6 +78,8 @@ class Config {
     this.debug = int('vsql_debug', 0);
     this.slowQueryMs = int('vsql_slow_query_warning', 150);
     this.txRetries = Math.max(0, int('vsql_tx_retries', 2));
+    this.breakerThreshold = Math.max(0, int('vsql_breaker_threshold', 10));
+    this.breakerResetMs = int('vsql_breaker_reset', 30_000);
 
     this.cacheEnabled = bool('vsql_cache', false);
     this.cacheSize = int('vsql_cache_size', 500);
@@ -108,6 +112,7 @@ class Config {
       `cache       ${this.cacheEnabled ? `on (size ${this.cacheSize}, ttl ${this.cacheTtl}ms)` : 'off'}`,
       `migrations  ${this.autoMigrate ? 'on' : 'off'} (${this.migrationsDir})`,
       `serverHint  ${this.serverHint}, slowQuery ${this.slowQueryMs}ms, debug ${this.debug}`,
+      `breaker     ${this.breakerThreshold > 0 ? `after ${this.breakerThreshold} failed reconnects, reset ${this.breakerResetMs}ms` : 'off'}`,
       `compat      ${this.compat ? 'on (oxmysql / ghmattimysql / mysql-async)' : 'off'}`,
       `typeCast    ${this.typeCast ? 'on (oxmysql-compatible)' : 'off'}`
     ];
