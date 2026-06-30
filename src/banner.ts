@@ -35,7 +35,7 @@ export function printBanner(version: string, repo: string): void {
   for (const l of LOGO) line(`${C.cyan}${l}`);
   line();
   line(`  ${C.reset}High-performance MySQL/MariaDB resource for FiveM`);
-  line(`  ${C.grey}v${version}  ${C.cyan}•${C.grey}  successor to oxmysql  ${C.cyan}•${C.grey}  github.com/${repo}`);
+  line(`  ${C.grey}v${version}  ${C.cyan}•${C.grey}  github.com/${repo}`);
   line();
 }
 
