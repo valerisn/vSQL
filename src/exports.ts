@@ -70,6 +70,60 @@ export function registerExports(): void {
     return bridge(db.whenReady().then(() => db.transaction(queries)), cb);
   });
 
+  // Merge the calling resource into a per-call options object (for attribution).
+  // Read synchronously here, before the first await.
+  const withResource = (userOpts?: any) => {
+    const resource = invokingResource();
+    if (userOpts && typeof userOpts === 'object') return { ...userOpts, resource };
+    return resource ? { resource } : undefined;
+  };
+
+  // CRUD helpers: build a parameterised statement from a table + data/where.
+  exports('insertInto', (table: string, data: any, optsOrCb?: any, cb?: any) => {
+    if (typeof optsOrCb === 'function') {
+      cb = optsOrCb;
+      optsOrCb = undefined;
+    }
+    const opts = withResource(optsOrCb);
+    return bridge(db.whenReady().then(() => db.insertInto(table, data, opts)), cb);
+  });
+  exports('updateWhere', (table: string, data: any, where: any, optsOrCb?: any, cb?: any) => {
+    if (typeof optsOrCb === 'function') {
+      cb = optsOrCb;
+      optsOrCb = undefined;
+    }
+    const opts = withResource(optsOrCb);
+    return bridge(db.whenReady().then(() => db.updateWhere(table, data, where, opts)), cb);
+  });
+  exports('deleteWhere', (table: string, where: any, optsOrCb?: any, cb?: any) => {
+    if (typeof optsOrCb === 'function') {
+      cb = optsOrCb;
+      optsOrCb = undefined;
+    }
+    const opts = withResource(optsOrCb);
+    return bridge(db.whenReady().then(() => db.deleteWhere(table, where, opts)), cb);
+  });
+  exports('find', (table: string, where?: any, optsOrCb?: any, cb?: any) => {
+    if (typeof where === 'function') {
+      cb = where;
+      where = undefined;
+    } else if (typeof optsOrCb === 'function') {
+      cb = optsOrCb;
+      optsOrCb = undefined;
+    }
+    return bridge(db.whenReady().then(() => db.find(table, where, optsOrCb)), cb);
+  });
+  exports('findOne', (table: string, where?: any, optsOrCb?: any, cb?: any) => {
+    if (typeof where === 'function') {
+      cb = where;
+      where = undefined;
+    } else if (typeof optsOrCb === 'function') {
+      cb = optsOrCb;
+      optsOrCb = undefined;
+    }
+    return bridge(db.whenReady().then(() => db.findOne(table, where, optsOrCb)), cb);
+  });
+
   // Schema introspection.
   exports('tableExists', (table: string, cb?: any) =>
     bridge(db.whenReady().then(() => db.tableExists(table)), cb)

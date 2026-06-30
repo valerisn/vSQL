@@ -78,6 +78,20 @@ export interface Stats {
   uptimeMs: number;
 }
 
+/** A WHERE for the CRUD helpers: ANDed equality/IN conditions, or a raw [sql, params]. */
+export type Where = Record<string, any> | [string, any[]?];
+
+export interface FindOptions {
+  /** Columns to select; defaults to *. */
+  columns?: string[];
+  /** Single column to order by (escaped as an identifier). */
+  orderBy?: string;
+  /** Order direction; anything other than 'DESC' is treated as 'ASC'. */
+  order?: 'ASC' | 'DESC';
+  limit?: number;
+  offset?: number;
+}
+
 export interface ColumnInfo {
   /** Column name. */
   name: string;
@@ -151,6 +165,22 @@ export interface VSql {
   transaction(queries: TransactionQuery[]): Promise<any[]>;
   transaction<T>(handler: (tx: TransactionApi) => Promise<T>): Promise<T>;
   transaction(queries: TransactionQuery[], cb: Callback<any[]>): void;
+
+  /** Insert one row (or many) from an object; returns insertId. */
+  insertInto(table: string, data: Record<string, any> | Record<string, any>[], opts?: QueryOptions): Promise<number>;
+  insertInto(table: string, data: Record<string, any> | Record<string, any>[], cb: Callback<number>): void;
+  /** Update rows matching a WHERE; returns affectedRows. A WHERE is required. */
+  updateWhere(table: string, data: Record<string, any>, where: Where, opts?: QueryOptions): Promise<number>;
+  updateWhere(table: string, data: Record<string, any>, where: Where, cb: Callback<number>): void;
+  /** Delete rows matching a WHERE; returns affectedRows. A WHERE is required. */
+  deleteWhere(table: string, where: Where, opts?: QueryOptions): Promise<number>;
+  deleteWhere(table: string, where: Where, cb: Callback<number>): void;
+  /** Select rows matching a WHERE; returns an array of rows. */
+  find<T = any>(table: string, where?: Where, opts?: FindOptions): Promise<T[]>;
+  find<T = any>(table: string, where: Where, cb: Callback<T[]>): void;
+  /** Select the first row matching a WHERE, or null. */
+  findOne<T = any>(table: string, where?: Where, opts?: FindOptions): Promise<T | null>;
+  findOne<T = any>(table: string, where: Where, cb: Callback<T | null>): void;
 
   /** Whether a table exists in the connected database. */
   tableExists(table: string): Promise<boolean>;

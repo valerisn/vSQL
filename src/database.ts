@@ -18,6 +18,7 @@ import {
   SQL_TABLE_EXISTS
 } from './schema';
 import { castValue } from './typecast';
+import { buildDelete, buildInsert, buildSelect, buildUpdate, FindOptions, Where } from './crud';
 import { runAtomic } from './retry';
 import { ReadyGate } from './gate';
 import {
@@ -339,6 +340,35 @@ class Database {
 
   async listTables(): Promise<string[]> {
     return shapeTables(await this.query(SQL_LIST_TABLES));
+  }
+
+  // --- CRUD helpers --------------------------------------------------------
+  // Build a parameterised statement (identifiers escaped, values bound) and run
+  // it through the normal query path. For anything past equality/IN, use raw SQL.
+
+  insertInto(table: string, data: Record<string, any> | Record<string, any>[], opts?: QueryOptions): Promise<number> {
+    const q = buildInsert(table, data);
+    return this.insert(q.sql, q.values, opts);
+  }
+
+  updateWhere(table: string, data: Record<string, any>, where: Where, opts?: QueryOptions): Promise<number> {
+    const q = buildUpdate(table, data, where);
+    return this.update(q.sql, q.values, opts);
+  }
+
+  deleteWhere(table: string, where: Where, opts?: QueryOptions): Promise<number> {
+    const q = buildDelete(table, where);
+    return this.update(q.sql, q.values, opts);
+  }
+
+  find(table: string, where?: Where, opts?: FindOptions): Promise<any[]> {
+    const q = buildSelect(table, where, opts);
+    return this.query(q.sql, q.values);
+  }
+
+  findOne(table: string, where?: Where, opts?: FindOptions): Promise<any> {
+    const q = buildSelect(table, where, { ...opts, limit: 1 });
+    return this.single(q.sql, q.values);
   }
 
   // Batch-aware prepared execution: an array of arrays runs the same statement
