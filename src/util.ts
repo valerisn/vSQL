@@ -17,3 +17,12 @@ export function preview(sql: string, max = 200): string {
 export function isReadQuery(sql: string): boolean {
   return /^\s*(?:\(|\/\*[\s\S]*?\*\/|--.*\n|#.*\n|\s)*(?:select|with|show|describe|desc|explain)\b/i.test(sql);
 }
+
+// Locking reads (`SELECT ... FOR UPDATE`, `LOCK IN SHARE MODE`, MySQL 8's
+// `FOR SHARE`) acquire row locks and must hit the server every time — serving
+// them from the result cache would silently drop the lock and break the
+// consistency they were asked for. They're still reads, so isReadQuery passes;
+// this guard keeps them out of the cache specifically.
+export function isLockingRead(sql: string): boolean {
+  return /\bfor\s+(?:update|share)\b|\block\s+in\s+share\s+mode\b/i.test(sql);
+}

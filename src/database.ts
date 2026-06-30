@@ -6,7 +6,7 @@ import { bindParams, Params } from './params';
 import { ResultCache } from './cache';
 import { Profiler } from './profiler';
 import { detectServer, ServerInfo } from './server';
-import { backoff, isReadQuery, preview, sleep } from './util';
+import { backoff, isLockingRead, isReadQuery, preview, sleep } from './util';
 
 type Mode = 'query' | 'execute';
 
@@ -128,7 +128,7 @@ class Database {
   }
 
   private async read(sql: string, params: Params, mode: Mode, shape: (rows: any) => any): Promise<any> {
-    const cacheable = this.cache.enabled && isReadQuery(sql);
+    const cacheable = this.cache.enabled && isReadQuery(sql) && !isLockingRead(sql);
     const key = cacheable ? this.cache.key(sql, params) : '';
     if (cacheable) {
       const hit = this.cache.get(key);
