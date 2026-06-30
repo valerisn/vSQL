@@ -8,6 +8,7 @@ import { Profiler, ProfilerStats } from './profiler';
 import { detectServer, ServerInfo } from './server';
 import { printReady } from './banner';
 import { asAffected, asInsertId, asScalar, asSingle, normalizeEntry, TransactionEntry } from './shape';
+import { castValue } from './typecast';
 import { runAtomic } from './retry';
 import { ReadyGate } from './gate';
 import {
@@ -30,6 +31,11 @@ export interface QueryOptions {
   timeout?: number;
   /** Set false to bypass the result cache for this call (always hit the server). */
   cache?: boolean;
+  /**
+   * Override oxmysql-compatible type-casting for this call: true forces it on,
+   * false forces it off, regardless of the vsql_typecast default.
+   */
+  typeCast?: boolean;
   /**
    * Internal: the resource that invoked the export, captured by the export layer
    * via GetInvokingResource() for per-resource profiling. Not part of the public
@@ -216,10 +222,17 @@ class Database {
     const runner = target ?? this.pool;
     const start = performance.now();
     try {
+      // Per-call typeCast override: when set, pass mysql2 an options object so
+      // this one call casts (or doesn't) regardless of the pool default. The
+      // common path (no override) keeps the plain (sql, values) call unchanged.
       const [rows] =
-        mode === 'execute'
-          ? await runner.execute(text, bound.values)
-          : await runner.query(text, bound.values);
+        opts?.typeCast !== undefined
+          ? mode === 'execute'
+            ? await runner.execute({ sql: text, values: bound.values, typeCast: opts.typeCast ? castValue : false })
+            : await runner.query({ sql: text, values: bound.values, typeCast: opts.typeCast ? castValue : false })
+          : mode === 'execute'
+            ? await runner.execute(text, bound.values)
+            : await runner.query(text, bound.values);
       const ms = performance.now() - start;
       this.profiler.record(sql, ms, opts?.resource);
       logger.query(text, bound.values, ms);

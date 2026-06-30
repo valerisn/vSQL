@@ -1,5 +1,6 @@
 import type { PoolOptions } from 'mysql2/promise';
 import type { ServerInfo } from './server';
+import { castValue } from './typecast';
 
 export type ServerHint = 'auto' | 'mysql' | 'mariadb';
 
@@ -57,6 +58,7 @@ class Config {
   versionRepo = 'valerisn/vSQL';
 
   compat = false; // claim oxmysql/ghmattimysql/mysql-async export namespaces
+  typeCast = false; // oxmysql-compatible casting (dates->ms, TINYINT(1)/BIT(1)->bool)
 
   load(): void {
     this.base = this.parseConnection();
@@ -86,6 +88,7 @@ class Config {
     this.versionRepo = str('vsql_version_repo', 'valerisn/vSQL');
 
     this.compat = bool('vsql_compat', false);
+    this.typeCast = bool('vsql_typecast', false);
   }
 
   // The connection target for logs - never includes the password.
@@ -105,7 +108,8 @@ class Config {
       `cache       ${this.cacheEnabled ? `on (size ${this.cacheSize}, ttl ${this.cacheTtl}ms)` : 'off'}`,
       `migrations  ${this.autoMigrate ? 'on' : 'off'} (${this.migrationsDir})`,
       `serverHint  ${this.serverHint}, slowQuery ${this.slowQueryMs}ms, debug ${this.debug}`,
-      `compat      ${this.compat ? 'on (oxmysql / ghmattimysql / mysql-async)' : 'off'}`
+      `compat      ${this.compat ? 'on (oxmysql / ghmattimysql / mysql-async)' : 'off'}`,
+      `typeCast    ${this.typeCast ? 'on (oxmysql-compatible)' : 'off'}`
     ];
   }
 
@@ -141,6 +145,9 @@ class Config {
       keepAliveInitialDelay: 10_000,
       multipleStatements: false,
       namedPlaceholders: false,
+      // Opt-in oxmysql-compatible casting at the pool level; per-call overrides
+      // (QueryOptions.typeCast) are applied per query in Database.exec.
+      ...(this.typeCast ? { typeCast: castValue } : {}),
       // mysql2 keeps an LRU of prepared statements per connection; this is the
       // "prepared-statement caching" knob for the execute() path.
       maxPreparedStatements: 1000,

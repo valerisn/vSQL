@@ -17,6 +17,8 @@ export interface QueryOptions {
   timeout?: number;
   /** Set false to bypass the result cache for this call. */
   cache?: boolean;
+  /** Force oxmysql-compatible type-casting on/off for this call (default: vsql_typecast). */
+  typeCast?: boolean;
 }
 
 export interface ResultSetHeader {
