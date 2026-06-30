@@ -28,6 +28,9 @@ vSQL gives you a configurable connection pool, prepared statement and result cac
 
 ## Documentation
 
+📖 **[Full docs site →](https://valerisn.github.io/vSQL/)**
+
+- [Getting started](docs/getting-started.md) — install, configure, first query.
 - [Recipes / cookbook](docs/recipes.md) — copy-paste solutions for common tasks.
 - [Architecture](docs/architecture.md) — how a query flows through vSQL, with a diagram.
 
