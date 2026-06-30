@@ -6,6 +6,7 @@ import { bindParams, Params } from './params';
 import { ResultCache } from './cache';
 import { Profiler } from './profiler';
 import { detectServer, ServerInfo } from './server';
+import { printReady } from './banner';
 import { backoff, isFatalConnectionError, isLockingRead, isReadQuery, preview, sleep } from './util';
 
 type Mode = 'query' | 'execute';
@@ -65,14 +66,19 @@ class Database {
           conn.release();
         }
 
+        const reconnected = this.reconnecting;
         this.ready = true;
         const target = config.base.socketPath
           ? config.base.socketPath
           : `${config.base.host}:${config.base.port}/${config.base.database}`;
-        logger.info(
-          `connected to ${this.server.type} ${this.server.version || '(unknown version)'} @ ${target} ` +
-            `(pool: ${config.poolSize}${this.server.supportsReturning ? ', RETURNING enabled' : ''})`
-        );
+        printReady({
+          server: prettyServer(this.server),
+          target,
+          pool: config.poolSize,
+          cacheEnabled: config.cacheEnabled,
+          supportsReturning: this.server.supportsReturning,
+          reconnected
+        });
         this.flushWaiters();
       } catch (err: any) {
         if (this.pool) {
@@ -326,6 +332,14 @@ class Database {
     }
     this.pool = null;
   }
+}
+
+// A short, readable label for the status box, e.g. "MariaDB 10.11". Falls back
+// to the raw VERSION() string when we couldn't parse a major/minor.
+function prettyServer(server: ServerInfo): string {
+  const name = server.type === 'mariadb' ? 'MariaDB' : server.type === 'mysql' ? 'MySQL' : 'database';
+  if (server.major > 0) return `${name} ${server.major}.${server.minor}`;
+  return server.version ? `${name} ${server.version}` : name;
 }
 
 function normalizeEntry(entry: TransactionQuery): [string, Params] {

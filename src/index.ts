@@ -4,7 +4,8 @@ import { db } from './database';
 import { registerExports } from './exports';
 import { registerCommands } from './commands';
 import { migrator } from './migrations';
-import { checkVersion } from './version';
+import { checkVersion, currentVersion } from './version';
+import { printBanner } from './banner';
 
 const resourceName = GetCurrentResourceName();
 
@@ -14,7 +15,8 @@ config.load();
 registerExports();
 registerCommands();
 
-logger.raw(`${logger.color.cyan}[vSQL]${logger.color.reset} starting (debug=${config.debug})`);
+printBanner(currentVersion() || '?', config.versionRepo);
+logger.debug(`debug logging level ${config.debug}`);
 
 // Best-effort, fire-and-forget: never let an update check delay the pool coming up.
 void checkVersion();

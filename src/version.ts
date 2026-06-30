@@ -23,7 +23,7 @@ function compare(a: SemVer, b: SemVer): number {
   return a.major - b.major || a.minor - b.minor || a.patch - b.patch;
 }
 
-function currentVersion(): string {
+export function currentVersion(): string {
   try {
     return GetResourceMetadata(GetCurrentResourceName(), 'version', 0) || '';
   } catch {
