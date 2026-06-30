@@ -1,6 +1,7 @@
 import { db } from './database';
 import { config } from './config';
 import { logger } from './logger';
+import { invokingResource } from './invoker';
 
 // Crossover compatibility for resources written against other MySQL resources.
 //
@@ -30,11 +31,14 @@ function bridge(promise: Promise<any>, cb?: any): Promise<any> | void {
 // (query, params?, cb?) - the shape oxmysql/ghmatti/mysql-async callers use.
 function forward(method: Method): AnyFn {
   return (query: string, params?: any, cb?: any) => {
+    // Attribute the compat-routed call to its caller, same as a native export.
+    const resource = invokingResource();
     if (typeof params === 'function') {
       cb = params;
       params = undefined;
     }
-    return bridge(db.whenReady().then(() => (db as any)[method](query, params)), cb);
+    const opts = resource ? { resource } : undefined;
+    return bridge(db.whenReady().then(() => (db as any)[method](query, params, opts)), cb);
   };
 }
 

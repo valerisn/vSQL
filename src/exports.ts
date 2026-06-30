@@ -1,15 +1,8 @@
 import { db } from './database';
 import { logger } from './logger';
+import { invokingResource } from './invoker';
 
 type Callback = (result: any, error?: any) => void;
-
-// The resource that called the export currently being handled. Must be read
-// synchronously, before any await, while we're still inside the export call -
-// afterwards GetInvokingResource() no longer refers to the caller. Returns
-// undefined off the FXServer runtime (e.g. unit tests) so nothing breaks.
-function invoker(): string | undefined {
-  return typeof GetInvokingResource === 'function' ? GetInvokingResource() || undefined : undefined;
-}
 
 // Bridges a promise to either Promise-style (JS `await`) or callback-style
 // usage. When a node-style callback is supplied we never return the promise, so
@@ -32,7 +25,7 @@ export function registerExports(): void {
   const standard = (method: 'query' | 'execute' | 'single' | 'scalar' | 'insert' | 'update' | 'prepare') => {
     return (sql: string, params?: any, optsOrCb?: any, cb?: any) => {
       // Capture the caller before anything async; it's gone after the first await.
-      const resource = invoker();
+      const resource = invokingResource();
       if (typeof params === 'function') {
         cb = params;
         params = undefined;
