@@ -11,11 +11,18 @@ export default defineConfig({
   cleanUrls: true,
   head: [['link', { rel: 'icon', href: '/vSQL/icon.svg' }]],
   themeConfig: {
-    logo: '/logo.svg',
     nav: [
-      { text: 'Getting started', link: '/getting-started' },
+      {
+        text: 'Guide',
+        items: [
+          { text: 'Getting started', link: '/getting-started' },
+          { text: 'Installation', link: '/installation' },
+          { text: 'Configuration', link: '/configuration' }
+        ]
+      },
       { text: 'Recipes', link: '/recipes' },
-      { text: 'Architecture', link: '/architecture' }
+      { text: 'Architecture', link: '/architecture' },
+      { text: 'Compatibility', link: '/compatibility' }
     ],
     sidebar: [
       {
@@ -26,10 +33,18 @@ export default defineConfig({
         ]
       },
       {
+        text: 'Setup',
+        items: [
+          { text: 'Installation', link: '/installation' },
+          { text: 'Configuration', link: '/configuration' }
+        ]
+      },
+      {
         text: 'Usage',
         items: [
           { text: 'Recipes', link: '/recipes' },
-          { text: 'Architecture', link: '/architecture' }
+          { text: 'Architecture', link: '/architecture' },
+          { text: 'Compatibility', link: '/compatibility' }
         ]
       }
     ],
