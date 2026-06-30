@@ -1,0 +1,37 @@
+<svg width="820" height="524" viewBox="0 0 820 524" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="'Consolas','SFMono-Regular','Menlo','DejaVu Sans Mono',monospace" font-size="15">
+  <!-- window -->
+  <rect width="820" height="524" rx="14" fill="#0b1220"/>
+  <rect width="820" height="38" fill="#111827"/>
+  <path d="M0 14 a14 14 0 0 1 14 -14 h792 a14 14 0 0 1 14 14 v24 h-820 z" fill="#111827"/>
+  <circle cx="24" cy="19" r="6" fill="#ef4444"/>
+  <circle cx="46" cy="19" r="6" fill="#eab308"/>
+  <circle cx="68" cy="19" r="6" fill="#22c55e"/>
+  <text x="410" y="24" text-anchor="middle" fill="#64748b" font-size="13">FXServer console</text>
+
+  <!-- banner -->
+  <g fill="#38bdf8" xml:space="preserve">
+    <text x="26" y="72">__   __  ____    ___    _     </text>
+    <text x="26" y="94">\ \ / / / ___|  / _ \  | |    </text>
+    <text x="26" y="116"> \ V /  \___ \ | | | | | |    </text>
+    <text x="26" y="138">  \_/    ___) || |_| | | |___ </text>
+    <text x="26" y="160">         |____/  \__\_\ |_____|</text>
+  </g>
+  <text x="26" y="192" fill="#e2e8f0">High-performance MySQL/MariaDB resource for FiveM</text>
+  <text x="26" y="214" fill="#64748b">v1.0.0  <tspan fill="#38bdf8">•</tspan>  github.com/valerisn/vSQL</text>
+
+  <!-- connection status panel -->
+  <rect x="22" y="236" width="540" height="156" rx="10" fill="#0d1526" stroke="#38bdf8" stroke-opacity="0.6"/>
+  <text x="42" y="270" fill="#e2e8f0"><tspan fill="#22c55e">●</tspan>  Connected to <tspan fill="#22c55e">MariaDB 10.11</tspan></text>
+  <text x="42" y="294" fill="#64748b">   localhost:3306/fivem</text>
+  <g xml:space="preserve">
+    <text x="42" y="328" fill="#e2e8f0">Pool        <tspan fill="#38bdf8">8</tspan><tspan fill="#64748b"> connections</tspan></text>
+    <text x="42" y="352" fill="#e2e8f0">Cache       <tspan fill="#22c55e">enabled</tspan></text>
+    <text x="42" y="376" fill="#e2e8f0">RETURNING   <tspan fill="#22c55e">enabled</tspan></text>
+  </g>
+
+  <!-- vsql top -->
+  <text x="26" y="424" xml:space="preserve" fill="#e2e8f0"><tspan fill="#64748b">] </tspan>vsql top</text>
+  <text x="26" y="448"><tspan fill="#38bdf8">[vSQL]</tspan><tspan fill="#e2e8f0"> top 2 query shapes by total time</tspan></text>
+  <text x="26" y="470" xml:space="preserve"><tspan fill="#38bdf8">  1240ms</tspan><tspan fill="#64748b"> total  x4200, avg 0.3ms, max 5.1ms</tspan></text>
+  <text x="26" y="492" fill="#94a3b8" xml:space="preserve">    SELECT * FROM players WHERE id = ?</text>
+</svg>

@@ -20,6 +20,12 @@ An advanced successor to oxmysql, built on [mysql2](https://github.com/sidorares
 
 vSQL gives you a configurable connection pool, prepared statement and result caching, batched inserts, a built in migration runner, a query profiler, and first class MariaDB tuning. Export names mirror oxmysql where it makes sense, so migrating is mostly a find and replace.
 
+<div align="center">
+
+<img src="assets/terminal.svg" alt="vSQL console: startup banner, connection status, and vsql top profiler output" width="640">
+
+</div>
+
 ## Documentation
 
 - [Recipes / cookbook](docs/recipes.md) — copy-paste solutions for common tasks.
