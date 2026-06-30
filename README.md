@@ -336,6 +336,8 @@ npm run build       # bundle to dist/index.js
 > [!IMPORTANT]
 > Tests use Node's built in test runner with native TypeScript type stripping, so **Node 24 or newer** is required (see `.nvmrc`). They cover the pure modules (parameter binding, query classification, caching) and need no database.
 
+Benchmarks live in [`benchmarks/`](benchmarks/): `node benchmarks/micro.mjs` for the pure hot-path functions (no DB), and a database-backed throughput script. See [benchmarks/README.md](benchmarks/README.md).
+
 ### Releasing
 
 Pushing a `v*` tag (`git tag v1.1.0 && git push origin v1.1.0`) runs the [release workflow](.github/workflows/release.yml): it typechecks, tests, builds, and publishes a ready-to-drop-in `vSQL-vX.Y.Z.zip` as a GitHub release. That release is also what the in-resource version checker compares against.
