@@ -14,8 +14,23 @@ export function preview(sql: string, max = 200): string {
   return flat.length > max ? `${flat.slice(0, max)}…` : flat;
 }
 
+// Leading whitespace / parens / comments we skip before reading the first
+// keyword, shared by the two checks below.
+const LEAD = String.raw`^\s*(?:\(|\/\*[\s\S]*?\*\/|--.*\n|#.*\n|\s)*`;
+const READ_LEAD = new RegExp(`${LEAD}(?:select|with|show|describe|desc|explain)\\b`, 'i');
+const WITH_LEAD = new RegExp(`${LEAD}with\\b`, 'i');
+const DML_VERB = /\b(?:insert|update|delete|replace)\b/i;
+
 export function isReadQuery(sql: string): boolean {
-  return /^\s*(?:\(|\/\*[\s\S]*?\*\/|--.*\n|#.*\n|\s)*(?:select|with|show|describe|desc|explain)\b/i.test(sql);
+  if (!READ_LEAD.test(sql)) return false;
+  // A `WITH ...` (CTE) statement only reads when its top-level statement is a
+  // SELECT. CTE bodies are always SELECT, so a standalone INSERT/UPDATE/DELETE/
+  // REPLACE verb means the statement mutates — e.g. `WITH x AS (...) DELETE ...`.
+  // Treating it as a write keeps it out of the result cache and makes it
+  // invalidate like any other write. Erring toward "write" is the safe side:
+  // the worst case is a genuine read needlessly skips the cache.
+  if (WITH_LEAD.test(sql) && DML_VERB.test(sql)) return false;
+  return true;
 }
 
 // mysql2 flags unrecoverable connection failures with `fatal: true`; these

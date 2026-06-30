@@ -23,6 +23,19 @@ test('isReadQuery rejects writes', () => {
   }
 });
 
+test('isReadQuery treats a CTE that ends in DML as a write', () => {
+  for (const sql of [
+    'WITH x AS (SELECT id FROM t) DELETE FROM t WHERE id IN (SELECT id FROM x)',
+    'WITH x AS (SELECT 1 AS a) UPDATE t SET a = 1',
+    'WITH x AS (SELECT id FROM src) INSERT INTO dst SELECT id FROM x',
+    'WITH x AS (SELECT 1) REPLACE INTO t SELECT * FROM x'
+  ]) {
+    assert.ok(!isReadQuery(sql), `expected write: ${sql}`);
+  }
+  // A CTE feeding a SELECT is still a read.
+  assert.ok(isReadQuery('WITH x AS (SELECT 1) SELECT * FROM x'));
+});
+
 test('isLockingRead detects FOR UPDATE / FOR SHARE / LOCK IN SHARE MODE', () => {
   assert.ok(isLockingRead('SELECT * FROM t WHERE id = 1 FOR UPDATE'));
   assert.ok(isLockingRead('SELECT * FROM t FOR SHARE'));
