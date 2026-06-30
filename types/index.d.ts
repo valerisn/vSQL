@@ -19,6 +19,10 @@ export interface QueryOptions {
   cache?: boolean;
   /** Force oxmysql-compatible type-casting on/off for this call (default: vsql_typecast). */
   typeCast?: boolean;
+  /** Columns insertAndFetch returns (default all). */
+  returning?: string[];
+  /** The id column insertAndFetch's MySQL fallback selects by (default 'id'). */
+  idColumn?: string;
 }
 
 export interface ResultSetHeader {
@@ -180,6 +184,13 @@ export interface VSql {
   /** Insert one row (or many) from an object; returns insertId. */
   insertInto(table: string, data: Record<string, any> | Record<string, any>[], opts?: QueryOptions): Promise<number>;
   insertInto(table: string, data: Record<string, any> | Record<string, any>[], cb: Callback<number>): void;
+  /**
+   * Insert one row and return it. Single round-trip on MariaDB 10.5+
+   * (INSERT ... RETURNING), insert-then-select on MySQL. Pass `returning` to pick
+   * columns and `idColumn` for the MySQL fallback's key (default 'id').
+   */
+  insertAndFetch<T = any>(table: string, data: Record<string, any>, opts?: QueryOptions): Promise<T | null>;
+  insertAndFetch<T = any>(table: string, data: Record<string, any>, cb: Callback<T | null>): void;
   /** Update rows matching a WHERE; returns affectedRows. A WHERE is required. */
   updateWhere(table: string, data: Record<string, any>, where: Where, opts?: QueryOptions): Promise<number>;
   updateWhere(table: string, data: Record<string, any>, where: Where, cb: Callback<number>): void;

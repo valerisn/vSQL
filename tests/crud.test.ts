@@ -1,6 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildDelete, buildInsert, buildSelect, buildUpdate, escapeId } from '../src/crud.ts';
+import {
+  buildDelete,
+  buildInsert,
+  buildInsertReturning,
+  buildSelect,
+  buildSelectById,
+  buildUpdate,
+  escapeId
+} from '../src/crud.ts';
 
 test('escapeId backtick-wraps and doubles internal backticks', () => {
   assert.equal(escapeId('players'), '`players`');
@@ -77,6 +85,25 @@ test('a raw [sql, params] where is passed through with its params', () => {
   const q = buildSelect('players', ['money > ? AND job = ?', [1000, 'police']]);
   assert.equal(q.sql, 'SELECT * FROM `players` WHERE money > ? AND job = ?');
   assert.deepEqual(q.values, [1000, 'police']);
+});
+
+test('buildInsertReturning appends RETURNING * by default', () => {
+  const q = buildInsertReturning('players', { citizenid: 'ABC', name: 'bob' });
+  assert.equal(q.sql, 'INSERT INTO `players` (`citizenid`, `name`) VALUES (?, ?) RETURNING *');
+  assert.deepEqual(q.values, ['ABC', 'bob']);
+});
+
+test('buildInsertReturning escapes an explicit column list', () => {
+  const q = buildInsertReturning('players', { name: 'bob' }, ['id', 'created_at']);
+  assert.equal(q.sql, 'INSERT INTO `players` (`name`) VALUES (?) RETURNING `id`, `created_at`');
+});
+
+test('buildSelectById fetches the inserted row by id (default id column)', () => {
+  assert.equal(buildSelectById('players'), 'SELECT * FROM `players` WHERE `id` = ?');
+  assert.equal(
+    buildSelectById('players', 'citizenid', ['name', 'money']),
+    'SELECT `name`, `money` FROM `players` WHERE `citizenid` = ?'
+  );
 });
 
 test('buildDelete builds a parameterised delete and refuses an empty WHERE', () => {

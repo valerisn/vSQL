@@ -87,6 +87,14 @@ export function registerExports(): void {
     const opts = withResource(optsOrCb);
     return bridge(db.whenReady().then(() => db.insertInto(table, data, opts)), cb);
   });
+  exports('insertAndFetch', (table: string, data: any, optsOrCb?: any, cb?: any) => {
+    if (typeof optsOrCb === 'function') {
+      cb = optsOrCb;
+      optsOrCb = undefined;
+    }
+    const opts = withResource(optsOrCb);
+    return bridge(db.whenReady().then(() => db.insertAndFetch(table, data, opts)), cb);
+  });
   exports('updateWhere', (table: string, data: any, where: any, optsOrCb?: any, cb?: any) => {
     if (typeof optsOrCb === 'function') {
       cb = optsOrCb;

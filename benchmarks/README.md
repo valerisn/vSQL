@@ -63,6 +63,20 @@ sub-microsecond (~600 ns) - it is dwarfed by the round-trip it replaces. The rea
 end-to-end lever is the hit *rate* and the skipped trip, not shaving nanoseconds
 off an already-fast hit.
 
+## RETURNING (round-trip count)
+
+"Insert and get the inserted row" is two round-trips the classic way and one on
+MariaDB 10.5+ via `INSERT ... RETURNING` - what `vSQL.insertAndFetch` uses when
+the server supports it.
+
+```bash
+BENCH_DB=mysql://root:pw@localhost:3306/bench node benchmarks/returning.mjs
+```
+
+Detects the server from `VERSION()`: on MariaDB it times both paths and reports
+the speedup; on MySQL it times the two-trip baseline (the fallback). Run it once
+per engine to compare.
+
 ## Throughput (real database)
 
 Measures queries/sec and latency percentiles against a live MySQL/MariaDB, using the

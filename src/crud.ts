@@ -77,6 +77,25 @@ export function buildInsert(table: string, data: Record<string, any> | Record<st
   return { sql: `INSERT INTO ${escapeId(table)} (${colSql}) VALUES ${tuples.join(', ')}`, values };
 }
 
+// INSERT ... RETURNING <cols|*>, for MariaDB 10.5+ - the inserted row comes back
+// in the same round-trip as the insert.
+export function buildInsertReturning(
+  table: string,
+  data: Record<string, any> | Record<string, any>[],
+  returning?: string[]
+): BuiltQuery {
+  const q = buildInsert(table, data);
+  const cols = returning && returning.length ? returning.map(escapeId).join(', ') : '*';
+  return { sql: `${q.sql} RETURNING ${cols}`, values: q.values };
+}
+
+// The fallback read for servers without RETURNING: fetch the just-inserted row by
+// its id. The value (the insertId) is bound by the caller.
+export function buildSelectById(table: string, idColumn = 'id', returning?: string[]): string {
+  const cols = returning && returning.length ? returning.map(escapeId).join(', ') : '*';
+  return `SELECT ${cols} FROM ${escapeId(table)} WHERE ${escapeId(idColumn)} = ?`;
+}
+
 export function buildUpdate(table: string, data: Record<string, any>, where: Where): BuiltQuery {
   const cols = Object.keys(data);
   if (cols.length === 0) throw new Error('vSQL: update needs at least one column to set');

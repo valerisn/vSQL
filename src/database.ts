@@ -18,7 +18,16 @@ import {
   SQL_TABLE_EXISTS
 } from './schema';
 import { castValue } from './typecast';
-import { buildDelete, buildInsert, buildSelect, buildUpdate, FindOptions, Where } from './crud';
+import {
+  buildDelete,
+  buildInsert,
+  buildInsertReturning,
+  buildSelect,
+  buildSelectById,
+  buildUpdate,
+  FindOptions,
+  Where
+} from './crud';
 import { runAtomic } from './retry';
 import { ReadyGate } from './gate';
 import { CircuitBreaker } from './breaker';
@@ -44,6 +53,10 @@ export interface QueryOptions {
   timeout?: number;
   /** Set false to bypass the result cache for this call (always hit the server). */
   cache?: boolean;
+  /** Columns to return from insertAndFetch (default all). */
+  returning?: string[];
+  /** The id column used by insertAndFetch's MySQL fallback SELECT (default 'id'). */
+  idColumn?: string;
   /**
    * Override oxmysql-compatible type-casting for this call: true forces it on,
    * false forces it off, regardless of the vsql_typecast default.
@@ -445,6 +458,27 @@ class Database {
   insertInto(table: string, data: Record<string, any> | Record<string, any>[], opts?: QueryOptions): Promise<number> {
     const q = buildInsert(table, data);
     return this.insert(q.sql, q.values, opts);
+  }
+
+  // Insert one row and return it. On MariaDB 10.5+ this is a single round-trip via
+  // INSERT ... RETURNING; elsewhere it falls back to insert-then-select by id (two
+  // round-trips). Both paths run on the primary, so the row is read-after-write
+  // consistent (never a stale replica) and the read cache isn't consulted.
+  async insertAndFetch(table: string, data: Record<string, any>, opts?: QueryOptions): Promise<any> {
+    if (this.server.supportsReturning) {
+      const q = buildInsertReturning(table, data, opts?.returning);
+      const { rows } = await this.exec(q.sql, q.values, 'execute', undefined, opts);
+      this.invalidate();
+      return asSingle(rows);
+    }
+    const ins = buildInsert(table, data);
+    const { rows: header } = await this.exec(ins.sql, ins.values, 'execute', undefined, opts);
+    this.invalidate();
+    const id = asInsertId(header);
+    if (!id) return null;
+    const sel = buildSelectById(table, opts?.idColumn ?? 'id', opts?.returning);
+    const { rows } = await this.exec(sel, [id], 'execute', undefined, opts);
+    return asSingle(rows);
   }
 
   updateWhere(table: string, data: Record<string, any>, where: Where, opts?: QueryOptions): Promise<number> {

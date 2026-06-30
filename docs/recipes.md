@@ -115,6 +115,15 @@ for you (values bound, identifiers escaped). For anything past equality / `IN` /
 // insert one row (or pass an array of objects for a bulk insert)
 const id = await exports.vSQL.insertInto('players', { citizenid, name });
 
+// insert and get the whole row back - one round-trip on MariaDB 10.5+
+// (INSERT ... RETURNING), insert-then-select on MySQL
+const row = await exports.vSQL.insertAndFetch('players', { citizenid, name });
+// pick columns / set a non-'id' key column for the MySQL fallback:
+const row2 = await exports.vSQL.insertAndFetch('players', { citizenid, name }, {
+  returning: ['id', 'created_at'],
+  idColumn: 'id'
+});
+
 // update / delete by a WHERE object (a WHERE is required - no accidental
 // full-table writes)
 await exports.vSQL.updateWhere('players', { money: 500 }, { id });
