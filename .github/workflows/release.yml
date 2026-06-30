@@ -1,0 +1,44 @@
+name: Release
+
+# Tagging a version (e.g. `git tag v1.1.0 && git push --tags`) builds the
+# resource and publishes a ready-to-drop-in zip as a GitHub release. This is
+# also what the in-resource version checker compares against.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      # Gate the release on the same checks CI runs.
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+      # Stage only the files a server needs at runtime, under a vSQL/ folder so
+      # the zip extracts straight into resources/.
+      - name: Stage resource
+        run: |
+          mkdir -p staging/vSQL
+          cp -r fxmanifest.lua dist lib migrations schema.sql examples types README.md LICENSE staging/vSQL/
+
+      - name: Create archive
+        run: (cd staging && zip -r "../vSQL-${GITHUB_REF_NAME}.zip" vSQL)
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" "vSQL-${GITHUB_REF_NAME}.zip" --title "${GITHUB_REF_NAME}" --generate-notes

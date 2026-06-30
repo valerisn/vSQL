@@ -317,6 +317,10 @@ npm run build       # bundle to dist/index.js
 > [!IMPORTANT]
 > Tests use Node's built in test runner with native TypeScript type stripping, so **Node 24 or newer** is required (see `.nvmrc`). They cover the pure modules (parameter binding, query classification, caching) and need no database.
 
+### Releasing
+
+Pushing a `v*` tag (`git tag v1.1.0 && git push origin v1.1.0`) runs the [release workflow](.github/workflows/release.yml): it typechecks, tests, builds, and publishes a ready-to-drop-in `vSQL-vX.Y.Z.zip` as a GitHub release. That release is also what the in-resource version checker compares against.
+
 ## Contributing
 
 Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for the setup, coding style, and pull request process, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before taking part.
