@@ -62,6 +62,9 @@ class Config {
   compat = false; // claim oxmysql/ghmattimysql/mysql-async export namespaces
   typeCast = false; // oxmysql-compatible casting (dates->ms, TINYINT(1)/BIT(1)->bool)
 
+  replicas: BaseConnection[] = []; // read replicas; reads round-robin across them
+  replicaCooldownMs = 10_000; // how long a failed replica stays out of rotation
+
   load(): void {
     this.base = this.parseConnection();
     this.poolSize = int('vsql_pool_size', 8);
@@ -93,6 +96,35 @@ class Config {
 
     this.compat = bool('vsql_compat', false);
     this.typeCast = bool('vsql_typecast', false);
+
+    this.replicas = this.parseReplicas();
+    this.replicaCooldownMs = int('vsql_replica_cooldown', 10_000);
+  }
+
+  // Read-replica connections. Two ergonomic forms, combinable:
+  //   vsql_read_replicas  - comma-separated full connection strings (URL form)
+  //   vsql_replica_hosts  - comma-separated host[:port], reusing the primary's
+  //                         user/password/database (the common "same creds,
+  //                         different host" replica setup).
+  private parseReplicas(): BaseConnection[] {
+    const out: BaseConnection[] = [];
+    const list = str('vsql_read_replicas', '');
+    if (list) {
+      for (const part of list.split(',')) {
+        const cs = part.trim();
+        if (cs) out.push(/^(mysql|mariadb):\/\//i.test(cs) ? this.parseUrl(cs) : this.parseSemicolon(cs));
+      }
+    }
+    const hosts = str('vsql_replica_hosts', '');
+    if (hosts) {
+      for (const entry of hosts.split(',')) {
+        const trimmed = entry.trim();
+        if (!trimmed) continue;
+        const [host, port] = trimmed.split(':');
+        out.push({ ...this.base, host, port: port ? parseInt(port, 10) : this.base.port });
+      }
+    }
+    return out;
   }
 
   // The connection target for logs - never includes the password.
@@ -114,7 +146,8 @@ class Config {
       `serverHint  ${this.serverHint}, slowQuery ${this.slowQueryMs}ms, debug ${this.debug}`,
       `breaker     ${this.breakerThreshold > 0 ? `after ${this.breakerThreshold} failed reconnects, reset ${this.breakerResetMs}ms` : 'off'}`,
       `compat      ${this.compat ? 'on (oxmysql / ghmattimysql / mysql-async)' : 'off'}`,
-      `typeCast    ${this.typeCast ? 'on (oxmysql-compatible)' : 'off'}`
+      `typeCast    ${this.typeCast ? 'on (oxmysql-compatible)' : 'off'}`,
+      `replicas    ${this.replicas.length ? `${this.replicas.length} (${this.replicas.map((r) => `${r.host}:${r.port}`).join(', ')})` : 'none'}`
     ];
   }
 
@@ -135,9 +168,9 @@ class Config {
     return out;
   }
 
-  poolOptions(): PoolOptions {
+  poolOptions(base: BaseConnection = this.base): PoolOptions {
     return {
-      ...this.base,
+      ...base,
       connectionLimit: this.poolSize,
       maxIdle: this.maxIdle,
       idleTimeout: this.idleTimeout,

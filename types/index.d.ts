@@ -36,6 +36,13 @@ export interface ServerInfo {
   supportsReturning: boolean;
 }
 
+export interface ReplicaStatus {
+  /** host:port (or replicaN) label. */
+  label: string;
+  /** True while the replica is out of rotation after a connection failure. */
+  down: boolean;
+}
+
 export interface Health {
   /** True once the pool is connected and serving queries. */
   connected: boolean;
@@ -43,6 +50,8 @@ export interface Health {
   reconnecting: boolean;
   /** Circuit-breaker state: 'closed' (normal), 'open' (fast-failing), or 'half-open'. */
   breaker: 'closed' | 'open' | 'half-open';
+  /** Read-replica health, empty when none are configured. */
+  replicas: ReplicaStatus[];
   server: ServerInfo;
 }
 

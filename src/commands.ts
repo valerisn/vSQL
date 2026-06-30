@@ -67,6 +67,10 @@ function showDebug(): void {
   logger.raw(`${C.cyan}[vSQL]${C.reset} debug  (v${currentVersion() || '?'})`);
   logger.raw(`  state       ${state}${C.reset}${breaker}`);
   logger.raw(`  server      ${db.server.type} ${db.server.version || '?'} (RETURNING ${db.server.supportsReturning ? 'yes' : 'no'})`);
+  if (h.replicas.length) {
+    const parts = h.replicas.map((r) => `${r.label} ${r.down ? `${C.red}down${C.reset}` : `${C.green}up${C.reset}`}`);
+    logger.raw(`  replicas    ${parts.join(', ')}`);
+  }
   for (const lineText of config.summary()) logger.raw(`  ${lineText}`);
   logger.raw(`  live cache  ${s.cacheSize} entr${s.cacheSize === 1 ? 'y' : 'ies'}`);
   logger.raw(`  queries     ${s.count} (errors ${s.errors}, cache hits ${s.cacheHits}), up ${formatUptime(s.uptimeMs)}`);

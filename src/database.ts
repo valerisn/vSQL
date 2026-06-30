@@ -22,11 +22,13 @@ import { buildDelete, buildInsert, buildSelect, buildUpdate, FindOptions, Where 
 import { runAtomic } from './retry';
 import { ReadyGate } from './gate';
 import { CircuitBreaker } from './breaker';
+import { ReplicaSet, ReplicaStatus } from './replicas';
 import {
   backoff,
   connectionHint,
   isCacheable,
   isFatalConnectionError,
+  isLockingRead,
   isReadQuery,
   isRetryableError,
   preview,
@@ -80,6 +82,8 @@ class Database {
   private pool: Pool | null = null;
   private gate = new ReadyGate();
   private breaker = new CircuitBreaker();
+  private replicas = new ReplicaSet<Pool>();
+  private replicasReady = false;
   private connectedOnce = false;
   private reconnecting = false;
   private shuttingDown = false;
@@ -93,11 +97,18 @@ class Database {
     return this.gate.isReady;
   }
 
-  health(): { connected: boolean; reconnecting: boolean; breaker: string; server: ServerInfo } {
+  health(): {
+    connected: boolean;
+    reconnecting: boolean;
+    breaker: string;
+    replicas: ReplicaStatus[];
+    server: ServerInfo;
+  } {
     return {
       connected: this.gate.isReady,
       reconnecting: this.reconnecting,
       breaker: this.breaker.state(),
+      replicas: this.replicas.status(),
       server: this.server
     };
   }
@@ -117,6 +128,7 @@ class Database {
     this.cache.configure(config.cacheEnabled, config.cacheSize, config.cacheTtl);
     this.profiler.configure(config.slowQueryMs);
     this.breaker.configure(config.breakerThreshold, config.breakerResetMs);
+    this.setupReplicas();
 
     let attempt = 0;
     while (!this.gate.isReady) {
@@ -232,6 +244,38 @@ class Database {
     return this.gate.whenReady();
   }
 
+  // Build the read-replica pools once (start() may run again on reconnect). Each
+  // replica is an independent pool; their health is tracked lazily by ReplicaSet
+  // rather than a connect handshake, so a replica being down never blocks startup.
+  private setupReplicas(): void {
+    if (this.replicasReady) return;
+    this.replicasReady = true;
+    this.replicas.configure(config.replicaCooldownMs);
+    for (let i = 0; i < config.replicas.length; i++) {
+      const conn = config.replicas[i];
+      const label = conn.host ? `${conn.host}:${conn.port}` : `replica${i + 1}`;
+      try {
+        const pool = mysql.createPool(config.poolOptions(conn));
+        pool.on('connection', (c) => this.tuneConnection(c));
+        // Swallow idle-connection errors; query-time failures are handled by the
+        // read path (mark down + fall back to primary).
+        (pool as any).on('error', () => {});
+        this.replicas.add(pool, label);
+      } catch (err: any) {
+        logger.error(`failed to create read replica ${label}: ${err.message}`);
+      }
+    }
+    if (this.replicas.size > 0) logger.info(`read replicas: ${this.replicas.size} configured`);
+  }
+
+  // The pool a read should run on: a healthy replica when one is available, else
+  // the primary. Locking reads (FOR UPDATE / SHARE) always go to the primary -
+  // they take row locks and need read-after-write consistency.
+  private readTarget(sql: string): Pool | undefined {
+    if (this.replicas.size === 0 || isLockingRead(sql)) return undefined;
+    return this.replicas.next();
+  }
+
   private tuneConnection(conn: any): void {
     for (const stmt of config.sessionStatements(this.server)) {
       conn.query(stmt, (err: any) => {
@@ -245,7 +289,8 @@ class Database {
     params: Params,
     mode: Mode,
     target?: Queryable,
-    opts?: QueryOptions
+    opts?: QueryOptions,
+    fromReplica = false
   ): Promise<{ rows: any }> {
     if (!this.pool) throw new Error('vSQL: pool is not initialized');
     const bound = bindParams(sql, params);
@@ -278,7 +323,9 @@ class Database {
     } catch (err: any) {
       this.profiler.recordError(opts?.resource);
       logger.error(`query failed: ${err.message}\n        sql: ${preview(sql)}`);
-      this.handleConnectionLoss(err);
+      // A replica failure must not trigger a *primary* reconnect; the read path
+      // takes the replica out of rotation and retries on the primary instead.
+      if (!fromReplica) this.handleConnectionLoss(err);
       throw err;
     }
   }
@@ -299,10 +346,31 @@ class Database {
         return hit;
       }
     }
-    const { rows } = await this.exec(sql, params, mode, undefined, opts);
+    const rows = await this.runRead(sql, params, mode, opts);
     const shaped = shape(rows);
     if (cacheable) this.cache.set(key, shaped);
     return shaped;
+  }
+
+  // Run a read on a healthy replica when available, falling back to the primary
+  // if there's no replica or the chosen one fails with a connection error (it's
+  // then taken out of rotation for a cooldown).
+  private async runRead(sql: string, params: Params, mode: Mode, opts?: QueryOptions): Promise<any> {
+    const replica = this.readTarget(sql);
+    if (!replica) {
+      const { rows } = await this.exec(sql, params, mode, undefined, opts);
+      return rows;
+    }
+    try {
+      const { rows } = await this.exec(sql, params, mode, replica, opts, true);
+      return rows;
+    } catch (err: any) {
+      if (!isFatalConnectionError(err)) throw err;
+      this.replicas.markDown(replica);
+      logger.warn(`read replica failed (${err.code ?? err.message}); falling back to primary`);
+      const { rows } = await this.exec(sql, params, mode, undefined, opts);
+      return rows;
+    }
   }
 
   // Any write clears the result cache. It's blunt but always correct; finer
@@ -481,6 +549,14 @@ class Database {
   async shutdown(): Promise<void> {
     this.shuttingDown = true;
     this.gate.close();
+    // Drain the replica pools alongside the primary.
+    for (const replica of this.replicas.all()) {
+      try {
+        await replica.end();
+      } catch (err: any) {
+        logger.debug(`replica drain error: ${err.message}`);
+      }
+    }
     if (!this.pool) return;
     logger.info('draining connection pool...');
     try {
