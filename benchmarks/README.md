@@ -30,6 +30,22 @@ a network round-trip to the database, which is typically hundreds of microsecond
 > - it just means Node reparses the imported `.ts` files as ES modules. The project stays
 > CommonJS on purpose (the bundler and `build.js` rely on it), so the warning is expected.
 
+## Side-by-side vs oxmysql (parameter binding)
+
+Compares vSQL's `bindParams` against a faithful reproduction of oxmysql 2.14.1's
+`parseArguments` - the per-call binding cost, the one pure-JS hot path that
+differs between the two (everything downstream is the same mysql2).
+
+```bash
+node benchmarks/vs-oxmysql.mjs
+```
+
+The `@name`/`:name` row uses `named-placeholders` (oxmysql's converter) when it's
+resolvable - it usually is, since mysql2 depends on it; run from inside the
+cloned oxmysql repo to exercise oxmysql's exact patched build. The positional and
+IN-list rows always run. Results and interpretation are in
+[`../tests/README.md`](../tests/README.md#side-by-side-vs-oxmysql-parameter-binding).
+
 ## Throughput (real database)
 
 Measures queries/sec and latency percentiles against a live MySQL/MariaDB, using the
