@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { bindParams } from '../src/params.ts';
+import { bindParams, clearPlanCache } from '../src/params.ts';
 
 test('positional placeholders bind in order', () => {
   const { sql, values } = bindParams('SELECT * FROM t WHERE a = ? AND b = ?', [1, 'x']);
@@ -97,4 +97,50 @@ test('mixing named sql with an array throws', () => {
 
 test('a missing named value throws', () => {
   assert.throws(() => bindParams('SELECT @a', { b: 1 }), /missing value/);
+});
+
+// --- binding-plan memoisation -------------------------------------------------
+// The plan cache keys on the SQL string and stores structure only, so the same
+// query reused with different params must never leak values between calls.
+
+test('a reused positional query binds fresh values each call (no leak)', () => {
+  const sql = 'SELECT * FROM t WHERE a = ? AND b = ?';
+  assert.deepEqual(bindParams(sql, [1, 2]).values, [1, 2]);
+  assert.deepEqual(bindParams(sql, [3, 4]).values, [3, 4]); // cache hit
+  assert.deepEqual(bindParams(sql, [5]).values, [5, null]); // pad still applies
+});
+
+test('a reused named query binds fresh values each call via its template', () => {
+  const sql = 'UPDATE t SET a = @a WHERE id = @id';
+  const first = bindParams(sql, { a: 1, id: 9 });
+  assert.equal(first.sql, 'UPDATE t SET a = ? WHERE id = ?');
+  assert.deepEqual(first.values, [1, 9]);
+  const second = bindParams(sql, { a: 2, id: 8 });
+  assert.equal(second.sql, 'UPDATE t SET a = ? WHERE id = ?');
+  assert.deepEqual(second.values, [2, 8]); // template reused, values fresh
+});
+
+test('a named query with an array value still expands into an IN list', () => {
+  const { sql, values } = bindParams('SELECT * FROM t WHERE id IN :ids', { ids: [1, 2, 3] });
+  assert.equal(sql, 'SELECT * FROM t WHERE id IN (?, ?, ?)');
+  assert.deepEqual(values, [1, 2, 3]);
+});
+
+test('a query mixing ? and named defers to the full parser (throws on the ?)', () => {
+  assert.throws(() => bindParams('SELECT ?, @a', { a: 1 }), /positional/);
+});
+
+test('cold (uncached) and warm (cached) parses produce identical output', () => {
+  const cases = [
+    ['SELECT * FROM t WHERE a = ? AND b = ?', [1, 'x']],
+    ['SELECT * FROM t WHERE id IN ? AND x = ?', [[1, 2], 5]],
+    ['UPDATE t SET a = @a WHERE id = @id', { a: 1, id: 9 }],
+    ["SELECT '? :x @y' AS lit, col = ?", ['v']]
+  ];
+  for (const [sql, params] of cases) {
+    const warm = bindParams(sql, params); // populate the cache
+    clearPlanCache();
+    const cold = bindParams(sql, params); // re-analyze from scratch
+    assert.deepEqual(cold, warm, sql);
+  }
 });
