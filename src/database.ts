@@ -7,6 +7,7 @@ import { ResultCache } from './cache';
 import { Profiler, ProfilerStats } from './profiler';
 import { detectServer, ServerInfo } from './server';
 import { printReady } from './banner';
+import { asAffected, asInsertId, asScalar, asSingle, normalizeEntry, TransactionEntry } from './shape';
 import {
   backoff,
   connectionHint,
@@ -49,8 +50,6 @@ export interface TransactionApi {
   insert(sql: string, params?: Params): Promise<number>;
   update(sql: string, params?: Params): Promise<number>;
 }
-
-type TransactionQuery = string | [string, Params] | { query?: string; sql?: string; values?: Params; params?: Params };
 
 class Database {
   private pool: Pool | null = null;
@@ -280,34 +279,23 @@ class Database {
   }
 
   single(sql: string, params?: Params, opts?: QueryOptions): Promise<any> {
-    return this.read(sql, params, 'execute', (rows) => (Array.isArray(rows) ? rows[0] ?? null : null), opts);
+    return this.read(sql, params, 'execute', asSingle, opts);
   }
 
   scalar(sql: string, params?: Params, opts?: QueryOptions): Promise<any> {
-    return this.read(
-      sql,
-      params,
-      'execute',
-      (rows) => {
-        const row = Array.isArray(rows) ? rows[0] : undefined;
-        if (!row) return null;
-        const values = Object.values(row);
-        return values.length ? values[0] : null;
-      },
-      opts
-    );
+    return this.read(sql, params, 'execute', asScalar, opts);
   }
 
   async insert(sql: string, params?: Params, opts?: QueryOptions): Promise<number> {
     const { rows } = await this.exec(sql, params, 'execute', undefined, opts);
     this.invalidate();
-    return (rows as any)?.insertId ?? 0;
+    return asInsertId(rows);
   }
 
   async update(sql: string, params?: Params, opts?: QueryOptions): Promise<number> {
     const { rows } = await this.exec(sql, params, 'execute', undefined, opts);
     this.invalidate();
-    return (rows as any)?.affectedRows ?? 0;
+    return asAffected(rows);
   }
 
   // Batch-aware prepared execution: an array of arrays runs the same statement
@@ -336,7 +324,7 @@ class Database {
     });
   }
 
-  async transaction(arg: TransactionQuery[] | ((tx: TransactionApi) => Promise<any>)): Promise<any> {
+  async transaction(arg: TransactionEntry[] | ((tx: TransactionApi) => Promise<any>)): Promise<any> {
     return this.runAtomic(async (conn) => {
       let result: any;
       if (typeof arg === 'function') {
@@ -404,14 +392,10 @@ class Database {
     return {
       query: (sql, params) => this.exec(sql, params, 'query', conn).then(({ rows }) => rows),
       execute: (sql, params) => exec(sql, params, (r) => r),
-      single: (sql, params) => exec(sql, params, (r) => (Array.isArray(r) ? r[0] ?? null : null)),
-      scalar: (sql, params) =>
-        exec(sql, params, (r) => {
-          const row = Array.isArray(r) ? r[0] : undefined;
-          return row ? Object.values(row)[0] ?? null : null;
-        }),
-      insert: (sql, params) => exec(sql, params, (r) => r?.insertId ?? 0),
-      update: (sql, params) => exec(sql, params, (r) => r?.affectedRows ?? 0)
+      single: (sql, params) => exec(sql, params, asSingle),
+      scalar: (sql, params) => exec(sql, params, asScalar),
+      insert: (sql, params) => exec(sql, params, asInsertId),
+      update: (sql, params) => exec(sql, params, asAffected)
     };
   }
 
@@ -445,14 +429,6 @@ function prettyServer(server: ServerInfo): string {
   const name = server.type === 'mariadb' ? 'MariaDB' : server.type === 'mysql' ? 'MySQL' : 'database';
   if (server.major > 0) return `${name} ${server.major}.${server.minor}`;
   return server.version ? `${name} ${server.version}` : name;
-}
-
-function normalizeEntry(entry: TransactionQuery): [string, Params] {
-  if (typeof entry === 'string') return [entry, undefined];
-  if (Array.isArray(entry)) return [entry[0], entry[1]];
-  const sql = entry.query ?? entry.sql;
-  if (!sql) throw new Error('vSQL: transaction query entry is missing a "query" string');
-  return [sql, entry.values ?? entry.params];
 }
 
 export const db = new Database();
