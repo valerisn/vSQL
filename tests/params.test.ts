@@ -38,6 +38,21 @@ test('placeholders inside comments are left untouched', () => {
   assert.ok(sql.includes('-- not a ? here'));
 });
 
+test('a no-space "--" is an operator, not a comment, so a following ? still binds', () => {
+  const { sql, values } = bindParams('SELECT 5--?', [9]);
+  assert.equal(sql, 'SELECT 5--?');
+  assert.deepEqual(values, [9]);
+});
+
+test('"-- " (with trailing space) and a trailing "--" still open comments', () => {
+  // trailing-space form: the ? after it is inside the comment and not bound
+  const withSpace = bindParams('SELECT ? -- trailing ? comment\n, ?', [1, 2]);
+  assert.deepEqual(withSpace.values, [1, 2]);
+  // "--" at end of input opens a comment that consumes the rest of the line
+  const atEnd = bindParams('SELECT ? --', [1]);
+  assert.deepEqual(atEnd.values, [1]);
+});
+
 test('@@ system variables are not treated as named params', () => {
   const { sql, values } = bindParams('SELECT @@global.max_connections, ?', [1]);
   assert.equal(sql, 'SELECT @@global.max_connections, ?');

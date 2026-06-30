@@ -52,7 +52,12 @@ export function bindParams(sql: string, params: Params): BoundQuery {
       continue;
     }
 
-    if ((ch === '-' && sql[i + 1] === '-') || ch === '#') {
+    // `--` only opens a comment when followed by whitespace or end-of-input;
+    // `5--1` is `5 - -1`, not a comment. `#` always runs to end-of-line. Getting
+    // this right matters so a `?` after a no-space `--` is still bound.
+    const dashComment =
+      ch === '-' && sql[i + 1] === '-' && (i + 2 >= len || /\s/.test(sql[i + 2]));
+    if (dashComment || ch === '#') {
       while (i < len && sql[i] !== '\n') {
         out += sql[i];
         i++;
