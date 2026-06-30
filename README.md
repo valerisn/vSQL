@@ -129,6 +129,8 @@ set vsql_socket ""                 # unix socket / named pipe path (optional)
 | `vsql_cache_ttl` | `30000` | Cache entry TTL in ms. |
 | `vsql_migrations` | `true` | Run migrations on resource start. |
 | `vsql_migrations_dir` | `migrations` | Migrations directory, relative to the resource. |
+| `vsql_version_check` | `true` | Check GitHub for a newer release on start. |
+| `vsql_version_repo` | `valerisn/vSQL` | `owner/repo` to check against (for forks). |
 | `vsql_debug` | `0` | `0` off, `1` lifecycle, `2` logs every query with timing. |
 
 </details>

@@ -4,6 +4,7 @@ import { db } from './database';
 import { registerExports } from './exports';
 import { registerCommands } from './commands';
 import { migrator } from './migrations';
+import { checkVersion } from './version';
 
 const resourceName = GetCurrentResourceName();
 
@@ -14,6 +15,9 @@ registerExports();
 registerCommands();
 
 logger.raw(`${logger.color.cyan}[vSQL]${logger.color.reset} starting (debug=${config.debug})`);
+
+// Best-effort, fire-and-forget: never let an update check delay the pool coming up.
+void checkVersion();
 
 db.start()
   .then(async () => {

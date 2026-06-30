@@ -49,6 +49,9 @@ class Config {
   autoMigrate = true;
   migrationsDir = 'migrations';
 
+  versionCheck = true;
+  versionRepo = 'valerisn/vSQL';
+
   load(): void {
     this.base = this.parseConnection();
     this.poolSize = int('vsql_pool_size', 8);
@@ -68,6 +71,9 @@ class Config {
 
     this.autoMigrate = bool('vsql_migrations', true);
     this.migrationsDir = str('vsql_migrations_dir', 'migrations');
+
+    this.versionCheck = bool('vsql_version_check', true);
+    this.versionRepo = str('vsql_version_repo', 'valerisn/vSQL');
   }
 
   poolOptions(): PoolOptions {
