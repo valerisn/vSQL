@@ -77,6 +77,32 @@ Detects the server from `VERSION()`: on MariaDB it times both paths and reports
 the speedup; on MySQL it times the two-trip baseline (the fallback). Run it once
 per engine to compare.
 
+## Bulk writes (round-trip count)
+
+Inserting N rows three ways - per-row loop, transactional `batch()`, and a single
+multi-row `INSERT` - to show where the round-trips go.
+
+```bash
+BENCH_DB=mysql://root:pw@localhost:3306/bench BENCH_ROWS=500 node benchmarks/batch.mjs
+```
+
+The multi-row `INSERT` (one round-trip) is what `vSQL.insertInto(table, [rows...])`
+generates - prefer it for bulk inserts. `batch()` is for N *distinct* statements,
+where N round-trips are unavoidable (no `multipleStatements`, by design).
+
+## Read replicas (read throughput)
+
+Concurrent reads, primary-only vs primary + replica round-robin (vSQL's routing).
+
+```bash
+BENCH_DB=mysql://u:pw@primary/db BENCH_REPLICA=mysql://u:pw@replica/db \
+  node benchmarks/replica-read.mjs
+```
+
+A replica raises aggregate read throughput under load (single-read latency is
+unchanged) and the script also exercises failover to the primary. Writes always
+stay on the primary.
+
 ## Pool saturation (latency cliff)
 
 Past the pool size, queries queue for a free connection and tail latency climbs.
