@@ -125,6 +125,7 @@ set vsql_socket ""                 # unix socket / named pipe path (optional)
 | `vsql_collation` | `utf8mb4_unicode_ci` | Session collation. |
 | `vsql_timezone` | `Z` | mysql2 timezone handling. |
 | `vsql_wait_timeout` | `0` | If greater than 0, sets session `wait_timeout` and `interactive_timeout`. |
+| `vsql_query_timeout` | `0` | If greater than 0, caps statement runtime (ms) server-side. MariaDB caps all statements; MySQL only caps read-only `SELECT`s. |
 | `vsql_server_hint` | `auto` | Force server type: `auto`, `mysql`, or `mariadb`. |
 | `vsql_slow_query_warning` | `150` | Slow query threshold in ms. |
 | `vsql_cache` | `false` | Enable result caching. |

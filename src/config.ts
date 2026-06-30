@@ -39,6 +39,7 @@ class Config {
   collation = 'utf8mb4_unicode_ci';
   timezone = 'Z';
   waitTimeout = 0; // 0 = leave the server default alone
+  queryTimeout = 0; // ms; 0 = no server-side statement timeout
   serverHint: ServerHint = 'auto';
 
   debug = 0;
@@ -64,6 +65,7 @@ class Config {
     this.collation = str('vsql_collation', 'utf8mb4_unicode_ci');
     this.timezone = str('vsql_timezone', 'Z');
     this.waitTimeout = int('vsql_wait_timeout', 0);
+    this.queryTimeout = int('vsql_query_timeout', 0);
     this.serverHint = (str('vsql_server_hint', 'auto').toLowerCase() as ServerHint) || 'auto';
 
     this.debug = int('vsql_debug', 0);
@@ -110,6 +112,19 @@ class Config {
     const stmts = [`SET NAMES ${this.charset} COLLATE ${this.collation}`];
     if (this.waitTimeout > 0) {
       stmts.push(`SET SESSION wait_timeout = ${this.waitTimeout}, interactive_timeout = ${this.waitTimeout}`);
+    }
+    if (this.queryTimeout > 0 && server.type !== 'unknown') {
+      // Cap statement runtime server-side so a runaway query can't hold a
+      // connection (and hitch dependent resources) indefinitely. MariaDB's
+      // max_statement_time is in seconds and applies to all statements; MySQL's
+      // max_execution_time is in milliseconds and only caps read-only SELECTs.
+      // Skipped until the server type is known (the very first pool connection
+      // tunes before detection); that connection is re-tuned in Database.start.
+      stmts.push(
+        server.type === 'mariadb'
+          ? `SET SESSION max_statement_time = ${this.queryTimeout / 1000}`
+          : `SET SESSION max_execution_time = ${Math.round(this.queryTimeout)}`
+      );
     }
     return stmts;
   }

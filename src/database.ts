@@ -83,6 +83,9 @@ class Database {
         const conn = await this.pool.getConnection();
         try {
           this.server = await detectServer(conn, config.serverHint);
+          // This connection tuned before we knew the server type; re-tune it now
+          // so server-specific session setup (e.g. statement timeout) applies.
+          this.tuneConnection(conn);
         } finally {
           conn.release();
         }
