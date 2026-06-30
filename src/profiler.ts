@@ -4,6 +4,15 @@ export interface SlowEntry {
   at: number;
 }
 
+/** Aggregated query activity for a single calling resource. */
+export interface ResourceStat {
+  resource: string;
+  count: number;
+  totalMs: number;
+  avgMs: number;
+  errors: number;
+}
+
 export interface ProfilerStats {
   count: number;
   errors: number;
@@ -13,6 +22,7 @@ export interface ProfilerStats {
   p95: number;
   p99: number;
   slow: SlowEntry[];
+  byResource: ResourceStat[];
 }
 
 /** One aggregated query *shape* - all calls that differ only by literal values. */
@@ -28,6 +38,12 @@ interface ShapeAgg {
   count: number;
   totalMs: number;
   maxMs: number;
+}
+
+interface ResourceAgg {
+  count: number;
+  totalMs: number;
+  errors: number;
 }
 
 export class Profiler {
@@ -51,12 +67,17 @@ export class Profiler {
   // flood of distinct shapes can't grow memory without limit.
   private readonly maxShapes = 1000;
   private shapes = new Map<string, ShapeAgg>();
+  // Per calling-resource aggregates, so a monitor can see which resource is
+  // actually driving the database. Bounded like the shape table; resources are
+  // few in practice, so eviction is a safety net rather than a hot path.
+  private readonly maxResources = 256;
+  private resources = new Map<string, ResourceAgg>();
 
   configure(slowMs: number): void {
     this.slowMs = slowMs;
   }
 
-  record(sql: string, ms: number): void {
+  record(sql: string, ms: number, resource?: string): void {
     this.count++;
     this.totalMs += ms;
     if (this.samples.length < this.maxSamples) {
@@ -70,6 +91,11 @@ export class Profiler {
       if (this.slow.length > 50) this.slow.shift();
     }
     this.recordShape(sql, ms);
+    if (resource) {
+      const agg = this.resourceAgg(resource);
+      agg.count++;
+      agg.totalMs += ms;
+    }
   }
 
   private recordShape(sql: string, ms: number): void {
@@ -108,13 +134,53 @@ export class Profiler {
       .slice(0, limit);
   }
 
-  recordError(): void {
-    this.errors++;
+  // Fetch (or lazily create, with bounded eviction) the aggregate for a resource.
+  private resourceAgg(resource: string): ResourceAgg {
+    let agg = this.resources.get(resource);
+    if (!agg) {
+      if (this.resources.size >= this.maxResources) this.evictLightestResource();
+      agg = { count: 0, totalMs: 0, errors: 0 };
+      this.resources.set(resource, agg);
+    }
+    return agg;
   }
 
-  recordCacheHit(): void {
+  private evictLightestResource(): void {
+    let lightestKey: string | undefined;
+    let lightest = Infinity;
+    for (const [key, agg] of this.resources) {
+      if (agg.totalMs < lightest) {
+        lightest = agg.totalMs;
+        lightestKey = key;
+      }
+    }
+    if (lightestKey !== undefined) this.resources.delete(lightestKey);
+  }
+
+  // Activity broken down by calling resource, heaviest (by total time) first.
+  byResource(limit = 10): ResourceStat[] {
+    return [...this.resources.entries()]
+      .map(([resource, a]) => ({
+        resource,
+        count: a.count,
+        totalMs: a.totalMs,
+        avgMs: a.count ? a.totalMs / a.count : 0,
+        errors: a.errors
+      }))
+      .sort((a, b) => b.totalMs - a.totalMs)
+      .slice(0, limit);
+  }
+
+  recordError(resource?: string): void {
+    this.errors++;
+    if (resource) this.resourceAgg(resource).errors++;
+  }
+
+  recordCacheHit(resource?: string): void {
     this.cacheHits++;
     this.count++;
+    // A cache hit is a query the resource made; it just cost ~no server time.
+    if (resource) this.resourceAgg(resource).count++;
   }
 
   private percentile(p: number): number {
@@ -133,7 +199,8 @@ export class Profiler {
       p50: this.percentile(50),
       p95: this.percentile(95),
       p99: this.percentile(99),
-      slow: [...this.slow].reverse().slice(0, 10)
+      slow: [...this.slow].reverse().slice(0, 10),
+      byResource: this.byResource(20)
     };
   }
 
@@ -146,6 +213,7 @@ export class Profiler {
     this.sampleHead = 0;
     this.slow = [];
     this.shapes.clear();
+    this.resources.clear();
   }
 }
 

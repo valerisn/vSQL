@@ -72,6 +72,54 @@ test('normalizeShape erases literals, comments and IN-list length', () => {
   );
 });
 
+test('byResource attributes count and total time to the calling resource', () => {
+  const p = new Profiler();
+  p.record('SELECT 1', 10, 'esx_banking');
+  p.record('SELECT 2', 30, 'esx_banking');
+  p.record('SELECT 3', 5, 'qb-garages');
+  const by = p.byResource();
+  // Heaviest (by total time) first.
+  assert.equal(by[0].resource, 'esx_banking');
+  assert.equal(by[0].count, 2);
+  assert.equal(by[0].totalMs, 40);
+  assert.equal(by[0].avgMs, 20);
+  assert.equal(by[1].resource, 'qb-garages');
+  assert.equal(by[1].count, 1);
+});
+
+test('records without a resource are not attributed to anyone', () => {
+  const p = new Profiler();
+  p.record('SELECT 1', 10); // no resource
+  assert.equal(p.byResource().length, 0);
+  assert.equal(p.stats().count, 1); // still counted globally
+});
+
+test('recordError attributes errors to the resource without inflating count', () => {
+  const p = new Profiler();
+  p.record('SELECT 1', 10, 'esx_banking');
+  p.recordError('esx_banking');
+  const r = p.byResource()[0];
+  assert.equal(r.errors, 1);
+  assert.equal(r.count, 1); // the failed query is not counted as a completed one
+});
+
+test('a cache hit counts toward the resource but adds no time', () => {
+  const p = new Profiler();
+  p.recordCacheHit('esx_banking');
+  const r = p.byResource()[0];
+  assert.equal(r.count, 1);
+  assert.equal(r.totalMs, 0);
+  assert.equal(r.avgMs, 0);
+});
+
+test('byResource is exposed through stats() and cleared by reset()', () => {
+  const p = new Profiler();
+  p.record('SELECT 1', 10, 'esx_banking');
+  assert.equal(p.stats().byResource.length, 1);
+  p.reset();
+  assert.equal(p.stats().byResource.length, 0);
+});
+
 test('top() ranks shapes by total time, not single-call latency', () => {
   const p = new Profiler();
   // one slow call

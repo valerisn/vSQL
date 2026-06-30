@@ -3,6 +3,9 @@
 declare function GetConvar(name: string, defaultValue: string): string;
 declare function GetConvarInt(name: string, defaultValue: number): number;
 declare function GetCurrentResourceName(): string;
+// The resource that invoked the export currently being handled. Only meaningful
+// synchronously inside an export handler (before any await); '' / null off-call.
+declare function GetInvokingResource(): string;
 declare function GetResourcePath(resource: string): string;
 declare function GetResourceMetadata(resource: string, key: string, index: number): string;
 declare function PerformHttpRequest(
