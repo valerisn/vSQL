@@ -3,6 +3,14 @@ import { logger } from './logger';
 
 type Callback = (result: any, error?: any) => void;
 
+// The resource that called the export currently being handled. Must be read
+// synchronously, before any await, while we're still inside the export call -
+// afterwards GetInvokingResource() no longer refers to the caller. Returns
+// undefined off the FXServer runtime (e.g. unit tests) so nothing breaks.
+function invoker(): string | undefined {
+  return typeof GetInvokingResource === 'function' ? GetInvokingResource() || undefined : undefined;
+}
+
 // Bridges a promise to either Promise-style (JS `await`) or callback-style
 // usage. When a node-style callback is supplied we never return the promise, so
 // errors don't surface as unhandled rejections.
@@ -23,6 +31,8 @@ export function registerExports(): void {
   // the 3rd slot is per-call options ({ timeout, cache }).
   const standard = (method: 'query' | 'execute' | 'single' | 'scalar' | 'insert' | 'update' | 'prepare') => {
     return (sql: string, params?: any, optsOrCb?: any, cb?: any) => {
+      // Capture the caller before anything async; it's gone after the first await.
+      const resource = invoker();
       if (typeof params === 'function') {
         cb = params;
         params = undefined;
@@ -30,7 +40,8 @@ export function registerExports(): void {
         cb = optsOrCb;
         optsOrCb = undefined;
       }
-      const opts = optsOrCb && typeof optsOrCb === 'object' ? optsOrCb : undefined;
+      const userOpts = optsOrCb && typeof optsOrCb === 'object' ? optsOrCb : undefined;
+      const opts = userOpts || resource ? { ...userOpts, resource } : undefined;
       return bridge(db.whenReady().then(() => (db as any)[method](sql, params, opts)), cb);
     };
   };

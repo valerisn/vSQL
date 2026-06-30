@@ -27,9 +27,33 @@ function showProfiler(): void {
     `  latency: avg ${s.avgMs.toFixed(1)}ms   p50 ${s.p50.toFixed(1)}ms   ` +
       `p95 ${s.p95.toFixed(1)}ms   p99 ${s.p99.toFixed(1)}ms`
   );
+  if (s.byResource.length) {
+    logger.raw(`  ${C.yellow}busiest resources:${C.reset}`);
+    for (const r of s.byResource.slice(0, 5)) {
+      const errs = r.errors ? `, ${C.red}${r.errors} err${C.reset}` : '';
+      logger.raw(`    ${r.resource}  ${C.grey}x${r.count}, ${r.totalMs.toFixed(0)}ms total, avg ${r.avgMs.toFixed(1)}ms${errs}${C.reset}`);
+    }
+  }
   if (s.slow.length) {
     logger.raw(`  ${C.yellow}slowest recent queries:${C.reset}`);
     for (const q of s.slow) logger.raw(`    ${q.ms.toFixed(1)}ms  ${q.sql}`);
+  }
+}
+
+// Per-resource breakdown: which resource is actually driving the database.
+function showResources(): void {
+  const rows = db.stats().byResource;
+  logger.raw(`${C.cyan}[vSQL]${C.reset} ${rows.length} resource(s) by total query time`);
+  if (rows.length === 0) {
+    logger.raw('  (no attributed queries yet)');
+    return;
+  }
+  for (const r of rows) {
+    const errs = r.errors ? `, ${C.red}${r.errors} err${C.reset}` : '';
+    logger.raw(
+      `  ${C.cyan}${r.totalMs.toFixed(0)}ms${C.reset} total  ` +
+        `${C.grey}x${r.count}, avg ${r.avgMs.toFixed(1)}ms${errs}${C.reset}  ${r.resource}`
+    );
   }
 }
 
@@ -101,6 +125,10 @@ export function registerCommands(): void {
               showTop(Number.isNaN(n) ? 10 : n);
               break;
             }
+            case 'resources':
+            case 'res':
+              showResources();
+              break;
             case 'debug':
               showDebug();
               break;
@@ -109,7 +137,7 @@ export function registerCommands(): void {
               logger.info('profiler stats reset');
               break;
             default:
-              logger.warn(`unknown subcommand "${cmd}". try: vsql | vsql top | vsql debug | vsql migrate[:status|:rollback|:dry] | vsql cache clear`);
+              logger.warn(`unknown subcommand "${cmd}". try: vsql | vsql top | vsql resources | vsql debug | vsql migrate[:status|:rollback|:dry] | vsql cache clear`);
           }
         } catch (err: any) {
           logger.error(err.message);

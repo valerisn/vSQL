@@ -48,6 +48,15 @@ export interface SlowEntry {
   at: number;
 }
 
+/** Aggregated query activity for a single calling resource. */
+export interface ResourceStat {
+  resource: string;
+  count: number;
+  totalMs: number;
+  avgMs: number;
+  errors: number;
+}
+
 export interface Stats {
   count: number;
   errors: number;
@@ -57,6 +66,8 @@ export interface Stats {
   p95: number;
   p99: number;
   slow: SlowEntry[];
+  /** Query activity broken down by calling resource, heaviest first. */
+  byResource: ResourceStat[];
   /** Whether result caching is currently enabled. */
   cacheEnabled: boolean;
   /** Number of result sets currently held in the cache. */

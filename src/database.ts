@@ -30,6 +30,12 @@ export interface QueryOptions {
   timeout?: number;
   /** Set false to bypass the result cache for this call (always hit the server). */
   cache?: boolean;
+  /**
+   * Internal: the resource that invoked the export, captured by the export layer
+   * via GetInvokingResource() for per-resource profiling. Not part of the public
+   * call options - callers don't set this.
+   */
+  resource?: string;
 }
 
 // A queryable target: either the pool itself or a single connection (used for
@@ -215,14 +221,15 @@ class Database {
           ? await runner.execute(text, bound.values)
           : await runner.query(text, bound.values);
       const ms = performance.now() - start;
-      this.profiler.record(sql, ms);
+      this.profiler.record(sql, ms, opts?.resource);
       logger.query(text, bound.values, ms);
       if (ms >= config.slowQueryMs) {
-        logger.warn(`slow query ${ms.toFixed(1)}ms: ${preview(sql)}`);
+        const who = opts?.resource ? ` [${opts.resource}]` : '';
+        logger.warn(`slow query ${ms.toFixed(1)}ms${who}: ${preview(sql)}`);
       }
       return { rows };
     } catch (err: any) {
-      this.profiler.recordError();
+      this.profiler.recordError(opts?.resource);
       logger.error(`query failed: ${err.message}\n        sql: ${preview(sql)}`);
       this.handleConnectionLoss(err);
       throw err;
@@ -241,7 +248,7 @@ class Database {
     if (cacheable) {
       const hit = this.cache.get(key);
       if (hit !== undefined) {
-        this.profiler.recordCacheHit();
+        this.profiler.recordCacheHit(opts?.resource);
         return hit;
       }
     }
