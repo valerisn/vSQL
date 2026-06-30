@@ -26,6 +26,7 @@ vSQL gives you a configurable connection pool, prepared statement and result cac
 - [Configuration](#configuration)
 - [Usage](#usage)
 - [Exports](#exports)
+- [Events](#events)
 - [Migrations](#migrations)
 - [Console commands](#console-commands)
 - [Migrating from oxmysql](#migrating-from-oxmysql)
@@ -210,6 +211,22 @@ await exports.vSQL.transaction(async (tx) => {
 | `ready` | `(cb?)` | Resolves once the pool is connected. |
 
 **Lua aliases** (via `@vSQL/lib/MySQL.lua`): `MySQL.query`, `.execute`, `.single`, `.scalar`, `.insert`, `.update`, `.prepare`, `.batch`, `.transaction`, each with a `.await` form, plus legacy `MySQL.Sync.*` and `MySQL.Async.*`.
+
+### Events
+
+vSQL emits server events so dependent resources can react to connection state without polling `isReady()`.
+
+| Event | Payload | When |
+|---|---|---|
+| `vSQL:ready` | `ServerInfo` | The pool connects for the first time. |
+| `vSQL:reconnected` | `ServerInfo` | The pool reconnects after a mid-session loss. |
+| `vSQL:connectionLost` | `{ code, message }` | A fatal connection error is detected (reconnect begins). |
+
+```lua
+AddEventHandler('vSQL:ready', function(server)
+  print(('database up: %s %s'):format(server.type, server.version))
+end)
+```
 
 ## Migrations
 

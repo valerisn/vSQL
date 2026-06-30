@@ -101,6 +101,10 @@ class Database {
           reconnected
         });
         this.flushWaiters();
+        // Let dependent resources react without polling isReady()/ready().
+        const event = reconnected ? 'vSQL:reconnected' : 'vSQL:ready';
+        logger.debug(`emitting ${event}`);
+        safeEmit(event, this.server);
       } catch (err: any) {
         if (this.pool) {
           try {
@@ -130,6 +134,7 @@ class Database {
     this.reconnecting = true;
     this.ready = false;
     logger.warn(`lost database connection (${err.code ?? err.message}); reconnecting...`);
+    safeEmit('vSQL:connectionLost', { code: err.code ?? null, message: err.message ?? String(err) });
     const dead = this.pool;
     this.pool = null;
     void (async () => {
@@ -352,6 +357,16 @@ class Database {
       logger.debug(`pool drain error: ${err.message}`);
     }
     this.pool = null;
+  }
+}
+
+// Fire a FiveM event without ever letting a listener's error bubble back into
+// our connection lifecycle.
+function safeEmit(event: string, payload?: any): void {
+  try {
+    emit(event, payload);
+  } catch {
+    /* ignore — an event listener should never break the pool */
   }
 }
 
