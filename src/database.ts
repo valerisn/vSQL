@@ -8,6 +8,7 @@ import { Profiler, ProfilerStats } from './profiler';
 import { detectServer, ServerInfo } from './server';
 import { printReady } from './banner';
 import { asAffected, asInsertId, asScalar, asSingle, normalizeEntry, TransactionEntry } from './shape';
+import { runAtomic } from './retry';
 import {
   backoff,
   connectionHint,
@@ -348,42 +349,24 @@ class Database {
   // vsql_tx_retries extra attempts). The transaction is rolled back before each
   // retry, so replaying is safe for the database; note a callback-form
   // transaction with side effects *outside* the DB will see those repeated.
+  // The loop itself lives in ./retry; this wires it to the pool, the retry
+  // policy, cache invalidation, and backoff/logging.
   private async runAtomic<T>(work: (conn: PoolConnection) => Promise<T>): Promise<T> {
     if (!this.pool) throw new Error('vSQL: pool is not initialized');
-    const attempts = config.txRetries + 1;
-    let lastErr: any;
-    for (let attempt = 1; attempt <= attempts; attempt++) {
-      const conn = await this.pool.getConnection();
-      let release = true;
-      try {
-        await conn.beginTransaction();
-        const result = await work(conn);
-        await conn.commit();
-        this.invalidate();
-        return result;
-      } catch (err: any) {
-        try {
-          await conn.rollback();
-        } catch {
-          /* the connection may already be dead; nothing to undo */
-        }
-        lastErr = err;
-        if (attempt < attempts && isRetryableError(err)) {
-          conn.release();
-          release = false;
-          const delay = backoff(attempt, 50, 1000);
-          logger.warn(
-            `transaction conflict (${err.code ?? err.errno}); retry ${attempt}/${attempts - 1} in ${delay}ms`
-          );
-          await sleep(delay);
-          continue;
-        }
-        throw err;
-      } finally {
-        if (release) conn.release();
+    const pool = this.pool;
+    const retries = config.txRetries;
+    return runAtomic<T, PoolConnection>({
+      attempts: retries + 1,
+      acquire: () => pool.getConnection(),
+      work,
+      isRetryable: isRetryableError,
+      onCommit: () => this.invalidate(),
+      onRetry: async (attempt, err) => {
+        const delay = backoff(attempt, 50, 1000);
+        logger.warn(`transaction conflict (${err.code ?? err.errno}); retry ${attempt}/${retries} in ${delay}ms`);
+        await sleep(delay);
       }
-    }
-    throw lastErr;
+    });
   }
 
   private txApi(conn: PoolConnection): TransactionApi {
