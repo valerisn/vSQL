@@ -1,49 +1,37 @@
 # Getting started
 
-## Install
+The fast path to a working install. For the full walkthrough - prerequisites,
+prebuilt vs source, troubleshooting - see [Installation](/installation); for
+every setting, see [Configuration](/configuration).
 
-Drop the resource into your server's `resources/` folder as `vSQL`, then build it:
+## 1. Add the resource
+
+Drop a [release zip](https://github.com/valerisn/vSQL/releases) into `resources/`
+as `vSQL`, or build from source:
 
 ```bash
-cd vSQL
-npm install
-npm run build      # bundles src into dist/index.js plus type declarations
+cd resources
+git clone https://github.com/valerisn/vSQL
+cd vSQL && npm install && npm run build
 ```
 
-> The build output (`dist/`) is generated, not committed - build before first use, or grab a prebuilt zip from the [releases](https://github.com/valerisn/vSQL/releases).
+::: tip
+`dist/` is generated, not committed. Build once after cloning, or use a prebuilt
+release zip that already includes it.
+:::
 
-## Configure
-
-Set the connection in `server.cfg`, using **either** a connection string **or** discrete options:
+## 2. Configure & start
 
 ```cfg
-# Option A: connection string (URL or oxmysql-style semicolons)
 set vsql_connection_string "mysql://root:password@localhost:3306/fivem"
-
-# Option B: discrete options
-set vsql_host "localhost"
-set vsql_port 3306
-set vsql_user "root"
-set vsql_password ""
-set vsql_database "fivem"
-
 ensure vSQL
 ```
 
-Add `ensure vSQL` **before** any resource that depends on it. The full convar
-reference lives in the [README](https://github.com/valerisn/vSQL#configuration).
+Put `ensure vSQL` **before** any resource that queries the database.
 
-## First query
+## 3. First query
 
-In a consumer resource, declare the dependency and (for Lua) load the wrapper:
-
-```lua
--- fxmanifest.lua
-dependency 'vSQL'
-shared_script '@vSQL/lib/MySQL.lua'
-```
-
-Then query - Promise or callback, your choice:
+From **JavaScript**, call the exports directly - Promise or callback:
 
 ```js
 // Promise
@@ -55,14 +43,42 @@ exports.vSQL.single('SELECT * FROM players WHERE id = ?', [1], (row) => {
 });
 ```
 
-From here, the [Recipes](/recipes) page has copy-paste solutions for the common
-tasks, and [Architecture](/architecture) explains how a query flows through vSQL.
+From **Lua**, load the wrapper in your `fxmanifest.lua` first:
+
+```lua
+dependency 'vSQL'
+shared_script '@vSQL/lib/MySQL.lua'
+```
+
+```lua
+local row = MySQL.single.await('SELECT * FROM players WHERE id = ?', { 1 })
+print(row and row.name)
+```
+
+## Where to next
+
+<div class="vp-doc">
+
+- **[Recipes](/recipes)** - copy-paste solutions for inserts, transactions,
+  pagination, upserts, and more.
+- **[Architecture](/architecture)** - how a query flows through vSQL and what
+  each module owns.
+- **[Configuration](/configuration)** - the full convar reference and per-call
+  options.
+- **[Compatibility](/compatibility)** - drop-in mode for oxmysql / ghmattimysql /
+  mysql-async.
+
+</div>
 
 ## Console commands
 
+vSQL registers a single `vsql` command with subcommands:
+
 ```
-vsql              # profiler stats
+vsql              # profiler stats (queries, latency percentiles, busiest resources)
 vsql top          # heaviest query shapes by total time
-vsql debug        # diagnostics dump (redacted)
-vsql migrate      # apply pending migrations
+vsql resources    # per-resource query breakdown
+vsql debug        # full diagnostics dump (password-redacted)
+vsql cache clear  # empty the result cache
+vsql migrate      # apply pending migrations (also :status, :rollback, :dry)
 ```
