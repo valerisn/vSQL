@@ -64,6 +64,7 @@ export function registerExports(): void {
   exports('cacheClear', (pattern?: string) => db.cache.clear(pattern));
   exports('clearCache', (pattern?: string) => db.cache.clear(pattern));
   exports('getStats', () => db.stats());
+  exports('topQueries', (limit?: number) => db.profiler.top(typeof limit === 'number' ? limit : 10));
   exports('serverInfo', () => db.server);
   exports('health', () => db.health());
   exports('isReady', () => db.isConnected);

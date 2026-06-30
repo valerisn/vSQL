@@ -206,6 +206,7 @@ await exports.vSQL.transaction(async (tx) => {
 | `transaction` | `(queries[] or fn(tx), cb?)` | Atomic, rolls back on error. Returns results array or the callback's return. |
 | `cacheClear` / `clearCache` | `(pattern?)` | Clears the cache (all, or entries whose key contains `pattern`). Returns count. |
 | `getStats` | `()` | Stats `{ count, errors, cacheHits, avgMs, p50, p95, p99, slow[], cacheEnabled, cacheSize, uptimeMs }`. |
+| `topQueries` | `(limit?)` | Heaviest query *shapes* by total time `{ shape, count, totalMs, avgMs, maxMs }[]`. |
 | `serverInfo` | `()` | `{ type, version, major, minor, supportsReturning }`. |
 | `health` | `()` | `{ connected, reconnecting, server }`, live connection status. |
 | `isReady` | `()` | `boolean`, whether the pool is connected. |
@@ -246,6 +247,7 @@ Run these from the server console.
 
 ```
 vsql                     # show profiler stats
+vsql top [n]             # heaviest query shapes by total time (pg_stat_statements style)
 vsql debug               # dump diagnostics (redacted config, server, pool, cache)
 vsql migrate             # apply pending migrations
 vsql migrate:status      # show applied / pending / modified

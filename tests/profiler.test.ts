@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Profiler } from '../src/profiler.ts';
+import { Profiler, normalizeShape } from '../src/profiler.ts';
 
 test('counts every recorded query and tracks errors / cache hits', () => {
   const p = new Profiler();
@@ -52,4 +52,35 @@ test('reset clears counters and samples', () => {
   assert.equal(s.errors, 0);
   assert.equal(s.avgMs, 0);
   assert.equal(s.p50, 0);
+  assert.equal(p.top().length, 0);
+});
+
+test('normalizeShape erases literals, comments and IN-list length', () => {
+  assert.equal(
+    normalizeShape("SELECT * FROM players WHERE money > 1000 AND name = 'bob'"),
+    'SELECT * FROM players WHERE money > ? AND name = ?'
+  );
+  // calls that differ only by values collapse to one shape
+  assert.equal(
+    normalizeShape('SELECT * FROM t WHERE id = 5'),
+    normalizeShape('SELECT * FROM t WHERE id = 9')
+  );
+  // IN lists of different lengths collapse together
+  assert.equal(
+    normalizeShape('SELECT * FROM t WHERE id IN (1, 2, 3)'),
+    normalizeShape('SELECT * FROM t WHERE id IN (7, 8)')
+  );
+});
+
+test('top() ranks shapes by total time, not single-call latency', () => {
+  const p = new Profiler();
+  // one slow call
+  p.record('SELECT * FROM rare WHERE id = 1', 500);
+  // many fast calls of the same shape (different literal) -> bigger total
+  for (let i = 0; i < 1000; i++) p.record(`SELECT * FROM hot WHERE id = ${i}`, 2);
+  const top = p.top(2);
+  assert.equal(top.length, 2);
+  assert.match(top[0].shape, /hot/); // 2000ms total beats the single 500ms call
+  assert.equal(top[0].count, 1000);
+  assert.equal(top[0].totalMs, 2000);
 });

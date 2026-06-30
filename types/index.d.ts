@@ -57,6 +57,15 @@ export interface Stats {
   uptimeMs: number;
 }
 
+export interface ShapeStat {
+  /** The query with literals/comments erased, so calls that differ only by values group together. */
+  shape: string;
+  count: number;
+  totalMs: number;
+  avgMs: number;
+  maxMs: number;
+}
+
 export interface TransactionApi {
   query<T = any>(sql: string, params?: Params): Promise<T>;
   execute<T = any>(sql: string, params?: Params): Promise<T>;
@@ -112,6 +121,8 @@ export interface VSql {
   cacheClear(pattern?: string): number;
   clearCache(pattern?: string): number;
   getStats(): Stats;
+  /** Heaviest query shapes by total time consumed (pg_stat_statements style). */
+  topQueries(limit?: number): ShapeStat[];
   serverInfo(): ServerInfo;
   /** Connection/reconnection status plus detected server info. */
   health(): Health;

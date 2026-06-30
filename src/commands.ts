@@ -48,6 +48,23 @@ function showDebug(): void {
   logger.raw(`  ${C.grey}set vsql_debug 2 to log every query with timing.`);
 }
 
+// Heaviest query shapes by total time consumed — the pg_stat_statements view.
+function showTop(limit: number): void {
+  const rows = db.profiler.top(limit);
+  logger.raw(`${C.cyan}[vSQL]${C.reset} top ${rows.length} query shape(s) by total time`);
+  if (rows.length === 0) {
+    logger.raw('  (no queries recorded yet)');
+    return;
+  }
+  for (const r of rows) {
+    logger.raw(
+      `  ${C.cyan}${r.totalMs.toFixed(0)}ms${C.reset} total  ` +
+        `${C.grey}x${r.count}, avg ${r.avgMs.toFixed(1)}ms, max ${r.maxMs.toFixed(1)}ms${C.reset}`
+    );
+    logger.raw(`    ${r.shape}`);
+  }
+}
+
 export function registerCommands(): void {
   // Single `vsql` command with subcommands, accepting both `vsql migrate:status`
   // and `vsql migrate status` forms.
@@ -79,6 +96,11 @@ export function registerCommands(): void {
                 logger.info(`cache ${db.cache.enabled ? 'enabled' : 'disabled'}, ${db.cache.size} entries`);
               }
               break;
+            case 'top': {
+              const n = parseInt(action || args[1] || '10', 10);
+              showTop(Number.isNaN(n) ? 10 : n);
+              break;
+            }
             case 'debug':
               showDebug();
               break;
@@ -87,7 +109,7 @@ export function registerCommands(): void {
               logger.info('profiler stats reset');
               break;
             default:
-              logger.warn(`unknown subcommand "${cmd}". try: vsql | vsql debug | vsql migrate[:status|:rollback|:dry] | vsql cache clear`);
+              logger.warn(`unknown subcommand "${cmd}". try: vsql | vsql top | vsql debug | vsql migrate[:status|:rollback|:dry] | vsql cache clear`);
           }
         } catch (err: any) {
           logger.error(err.message);
