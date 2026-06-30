@@ -1,6 +1,3 @@
-import { config } from './config';
-import { preview } from './util';
-
 export interface SlowEntry {
   sql: string;
   ms: number;
@@ -22,18 +19,34 @@ export class Profiler {
   count = 0;
   errors = 0;
   cacheHits = 0;
+  // Slow-query threshold in ms. Configured from the convar at startup rather
+  // than read from the global config on every record(), so the profiler has no
+  // hidden dependency and can be exercised in isolation.
+  slowMs = 150;
   private totalMs = 0;
-  private samples: number[] = [];
+  // Latency samples kept in a fixed-size ring buffer. Writing into a slot we
+  // overwrite (instead of push + shift) keeps record() O(1) on the hot path
+  // once the window fills, rather than O(n) from shifting a growing array.
   private readonly maxSamples = 2000;
+  private samples: number[] = [];
+  private sampleHead = 0;
   private slow: SlowEntry[] = [];
+
+  configure(slowMs: number): void {
+    this.slowMs = slowMs;
+  }
 
   record(sql: string, ms: number): void {
     this.count++;
     this.totalMs += ms;
-    this.samples.push(ms);
-    if (this.samples.length > this.maxSamples) this.samples.shift();
-    if (ms >= config.slowQueryMs) {
-      this.slow.push({ sql: preview(sql), ms, at: Date.now() });
+    if (this.samples.length < this.maxSamples) {
+      this.samples.push(ms);
+    } else {
+      this.samples[this.sampleHead] = ms;
+      this.sampleHead = (this.sampleHead + 1) % this.maxSamples;
+    }
+    if (ms >= this.slowMs) {
+      this.slow.push({ sql: summarize(sql), ms, at: Date.now() });
       if (this.slow.length > 50) this.slow.shift();
     }
   }
@@ -73,6 +86,14 @@ export class Profiler {
     this.cacheHits = 0;
     this.totalMs = 0;
     this.samples = [];
+    this.sampleHead = 0;
     this.slow = [];
   }
+}
+
+// Collapse whitespace and cap length so a stored slow-query sample stays a short
+// one-liner in the profiler output. Kept local so the profiler has no imports.
+function summarize(sql: string, max = 200): string {
+  const flat = sql.replace(/\s+/g, ' ').trim();
+  return flat.length > max ? `${flat.slice(0, max)}…` : flat;
 }

@@ -47,6 +47,7 @@ class Database {
 
   async start(): Promise<void> {
     this.cache.configure(config.cacheEnabled, config.cacheSize, config.cacheTtl);
+    this.profiler.configure(config.slowQueryMs);
 
     let attempt = 0;
     while (!this.ready) {
