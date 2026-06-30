@@ -56,6 +56,8 @@ class Config {
   versionCheck = true;
   versionRepo = 'valerisn/vSQL';
 
+  compat = false; // claim oxmysql/ghmattimysql/mysql-async export namespaces
+
   load(): void {
     this.base = this.parseConnection();
     this.poolSize = int('vsql_pool_size', 8);
@@ -82,6 +84,8 @@ class Config {
 
     this.versionCheck = bool('vsql_version_check', true);
     this.versionRepo = str('vsql_version_repo', 'valerisn/vSQL');
+
+    this.compat = bool('vsql_compat', false);
   }
 
   // The connection target for logs - never includes the password.
@@ -100,7 +104,8 @@ class Config {
       `timeouts    wait ${this.waitTimeout || 'default'}, query ${this.queryTimeout ? `${this.queryTimeout}ms` : 'off'}`,
       `cache       ${this.cacheEnabled ? `on (size ${this.cacheSize}, ttl ${this.cacheTtl}ms)` : 'off'}`,
       `migrations  ${this.autoMigrate ? 'on' : 'off'} (${this.migrationsDir})`,
-      `serverHint  ${this.serverHint}, slowQuery ${this.slowQueryMs}ms, debug ${this.debug}`
+      `serverHint  ${this.serverHint}, slowQuery ${this.slowQueryMs}ms, debug ${this.debug}`,
+      `compat      ${this.compat ? 'on (oxmysql / ghmattimysql / mysql-async)' : 'off'}`
     ];
   }
 

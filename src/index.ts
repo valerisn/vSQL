@@ -3,6 +3,7 @@ import { logger } from './logger';
 import { db } from './database';
 import { registerExports } from './exports';
 import { registerCommands } from './commands';
+import { registerCompat } from './compat';
 import { migrator } from './migrations';
 import { checkVersion, currentVersion } from './version';
 import { printBanner } from './banner';
@@ -14,6 +15,7 @@ const resourceName = GetCurrentResourceName();
 config.load();
 registerExports();
 registerCommands();
+registerCompat();
 
 printBanner(currentVersion() || '?', config.versionRepo);
 logger.debug(`debug logging level ${config.debug}`);
