@@ -81,6 +81,10 @@ in-flight callers wait on the gate and resume on `vSQL:reconnected`.
 | `gate.ts` | The readiness gate - queue callers while the pool is down, release them on connect. |
 | `params.ts` | Placeholder binding - `?`, `@name`, `:name`, `IN (?)` expansion - with a memoised per-SQL plan. Always bound, never interpolated. |
 | `retry.ts` | The transaction-with-retry loop: run in a transaction, roll back and replay on deadlock / lock-wait. |
+| `breaker.ts` | Circuit breaker - fast-fail callers when the database is hard-down instead of queueing forever. |
+| `replicas.ts` | Health-aware, round-robin set of read replicas with failover to the primary. |
+| `crud.ts` | Safe SQL builders for the CRUD helpers - values bound, identifiers escaped. |
+| `schema.ts` | Schema introspection queries + row shaping (tableExists / columns / ...). |
 | `shape.ts` | Pure result shaping (`single` / `scalar` / `insert` / `update`) and transaction-entry normalisation. |
 | `cache.ts` | TTL + LRU result cache with substring invalidation. |
 | `profiler.ts` | Counters, latency ring buffer + percentiles, slow-query log, per-shape and per-resource aggregation. |

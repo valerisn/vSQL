@@ -105,6 +105,33 @@ await exports.vSQL.update('UPDATE players SET deleted_at = NOW() WHERE id = ?', 
 const live = await exports.vSQL.query('SELECT * FROM players WHERE deleted_at IS NULL');
 ```
 
+## CRUD helpers (no SQL)
+
+For the boring cases, skip writing SQL - these build a parameterised statement
+for you (values bound, identifiers escaped). For anything past equality / `IN` /
+`NULL` conditions, drop back to raw `query`.
+
+```js
+// insert one row (or pass an array of objects for a bulk insert)
+const id = await exports.vSQL.insertInto('players', { citizenid, name });
+
+// update / delete by a WHERE object (a WHERE is required - no accidental
+// full-table writes)
+await exports.vSQL.updateWhere('players', { money: 500 }, { id });
+await exports.vSQL.deleteWhere('inventory', { id: itemId });
+
+// read: find() returns rows, findOne() the first row or null
+const police = await exports.vSQL.find('players', { job: 'police' }, { orderBy: 'name', limit: 20 });
+const player = await exports.vSQL.findOne('players', { id });
+```
+
+The WHERE object ANDs its conditions; an array value becomes `IN (...)`, and
+`null` becomes `IS NULL`. Need `OR` or a comparison? Pass a raw escape hatch:
+
+```js
+const rich = await exports.vSQL.find('players', ['money > ? AND job = ?', [1000, 'police']]);
+```
+
 ## Transactions & batches
 
 ### Transfer money atomically (transaction)
@@ -185,6 +212,18 @@ AddEventHandler('vSQL:ready', (server) => print('db up: ' + server.type));
 | `vSQL:reconnected` | the pool reconnects after a drop |
 | `vSQL:connectionLost` | a fatal connection error is detected |
 | `onMySQLReady` | on connect (oxmysql / mysql-async compatibility signal) |
+
+### Probe the schema
+
+Handy for resources that self-migrate or adapt to an existing database:
+
+```js
+if (!(await exports.vSQL.tableExists('players'))) { /* create it */ }
+if (!(await exports.vSQL.columnExists('players', 'discord'))) { /* add it */ }
+
+const cols = await exports.vSQL.columns('players'); // [{ name, type, nullable, key, default }]
+const all  = await exports.vSQL.tables();           // ['players', 'vehicles', ...]
+```
 
 ### Inspect what's happening
 

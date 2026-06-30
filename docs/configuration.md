@@ -80,8 +80,27 @@ names (`schema.table`). It warns about this once on startup.
 | Convar | Default | Description |
 |---|---|---|
 | `vsql_tx_retries` | `2` | Extra attempts for a transaction/batch that hits a deadlock or lock-wait timeout. `0` disables retrying. |
+| `vsql_breaker_threshold` | `10` | Consecutive failed reconnects (after the first successful connect) before the circuit breaker opens and queries fast-fail instead of queueing. `0` disables it. |
+| `vsql_breaker_reset` | `30000` | Ms the breaker stays open before allowing a probe. |
 | `vsql_slow_query_warning` | `150` | Slow-query threshold in ms (logged and surfaced in `vsql top`). |
 | `vsql_debug` | `0` | `0` off, `1` lifecycle events, `2` logs every query with timing. |
+
+### Read replicas
+
+| Convar | Default | Description |
+|---|---|---|
+| `vsql_read_replicas` | _(empty)_ | Comma-separated replica connection strings. Reads round-robin across them; writes, locking reads, and transactions stay on the primary. |
+| `vsql_replica_hosts` | _(empty)_ | Comma-separated `host[:port]` replicas reusing the primary's user/password/database (the common "same creds, different host" case). |
+| `vsql_replica_cooldown` | `10000` | Ms a replica that failed a query stays out of rotation before being retried. |
+
+```cfg
+# reuse the primary's credentials, just point at the replica hosts
+set vsql_replica_hosts "10.0.0.2,10.0.0.3:3307"
+```
+
+A replica that errors with a connection failure is dropped from rotation for the
+cooldown and the read transparently falls back to the primary - a replica being
+down never blocks reads or trips the primary's reconnect.
 
 ### Migrations
 

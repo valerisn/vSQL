@@ -143,6 +143,11 @@ set vsql_socket ""                 # unix socket / named pipe path (optional)
 | `vsql_server_hint` | `auto` | Force server type: `auto`, `mysql`, or `mariadb`. |
 | `vsql_slow_query_warning` | `150` | Slow query threshold in ms. |
 | `vsql_tx_retries` | `2` | Extra attempts for a transaction/batch that hits a deadlock or lock-wait timeout. `0` disables retrying. |
+| `vsql_breaker_threshold` | `10` | Consecutive failed reconnects (after the first successful connect) before the circuit breaker opens and queries fast-fail. `0` disables it. |
+| `vsql_breaker_reset` | `30000` | Ms the breaker stays open before allowing a probe. |
+| `vsql_read_replicas` | _(empty)_ | Comma-separated replica connection strings; reads round-robin across them, writes stay on the primary. |
+| `vsql_replica_hosts` | _(empty)_ | Comma-separated `host[:port]` replicas reusing the primary's user/password/database. |
+| `vsql_replica_cooldown` | `10000` | Ms a failed replica stays out of rotation before being retried. |
 | `vsql_cache` | `false` | Enable result caching. |
 | `vsql_cache_size` | `500` | Max cached result sets. |
 | `vsql_cache_ttl` | `30000` | Cache entry TTL in ms. |
