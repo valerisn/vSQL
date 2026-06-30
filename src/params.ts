@@ -83,6 +83,9 @@ export function bindParams(sql: string, params: Params): BoundQuery {
       if (!isArray) {
         throw new Error('vSQL: positional "?" used but parameters were passed as a named object');
       }
+      // Reading past the end yields `undefined`, which expand() binds as NULL -
+      // so a statement with more placeholders than values pads the extras with
+      // NULL (matching oxmysql) instead of erroring on the count mismatch.
       out += expand((params as any[])[positional++], values);
       i++;
       continue;
@@ -127,11 +130,13 @@ export function bindParams(sql: string, params: Params): BoundQuery {
 
 function expand(value: any, values: any[]): string {
   // Arrays become (?, ?, ...) so `WHERE id IN ?` works. Buffers are scalar
-  // values, not lists, so they fall through to a single binding.
+  // values, not lists, so they fall through to a single binding. `undefined` is
+  // never a valid bind value (mysql2 rejects it), so it is coerced to NULL at
+  // every binding point - this is what turns a missing trailing param into NULL.
   if (Array.isArray(value)) {
     if (value.length === 0) return '(NULL)';
-    return `(${value.map((v) => (values.push(v), '?')).join(', ')})`;
+    return `(${value.map((v) => (values.push(v === undefined ? null : v), '?')).join(', ')})`;
   }
-  values.push(value);
+  values.push(value === undefined ? null : value);
   return '?';
 }

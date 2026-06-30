@@ -65,6 +65,28 @@ test('no params yields the sql unchanged with no values', () => {
   assert.deepEqual(values, []);
 });
 
+test('missing trailing positional params are padded with NULL (oxmysql parity)', () => {
+  // Two placeholders, one value -> the extra binds as NULL rather than erroring.
+  const { sql, values } = bindParams('INSERT INTO t (a, b) VALUES (?, ?)', [1]);
+  assert.equal(sql, 'INSERT INTO t (a, b) VALUES (?, ?)');
+  assert.deepEqual(values, [1, null]);
+});
+
+test('an explicit undefined value binds as NULL, never reaching the driver', () => {
+  const { values } = bindParams('SELECT ?, ?', [undefined, 2]);
+  assert.deepEqual(values, [null, 2]);
+});
+
+test('undefined inside an IN list is coerced to NULL too', () => {
+  const { sql, values } = bindParams('SELECT * FROM t WHERE id IN ?', [[1, undefined, 3]]);
+  assert.equal(sql, 'SELECT * FROM t WHERE id IN (?, ?, ?)');
+  assert.deepEqual(values, [1, null, 3]);
+});
+
+test('a missing NAMED param still throws (padding is positional-only)', () => {
+  assert.throws(() => bindParams('SELECT @a, @b', { a: 1 }), /missing value/);
+});
+
 test('mixing positional sql with a named object throws', () => {
   assert.throws(() => bindParams('SELECT ?', { a: 1 }), /positional/);
 });
