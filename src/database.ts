@@ -9,6 +9,7 @@ import { detectServer, ServerInfo } from './server';
 import { printReady } from './banner';
 import { asAffected, asInsertId, asScalar, asSingle, normalizeEntry, TransactionEntry } from './shape';
 import { runAtomic } from './retry';
+import { ReadyGate } from './gate';
 import {
   backoff,
   connectionHint,
@@ -54,10 +55,9 @@ export interface TransactionApi {
 
 class Database {
   private pool: Pool | null = null;
-  private ready = false;
+  private gate = new ReadyGate();
   private reconnecting = false;
   private shuttingDown = false;
-  private waiters: Array<() => void> = [];
 
   server: ServerInfo = { type: 'unknown', version: '', major: 0, minor: 0, supportsReturning: false };
   cache = new ResultCache();
@@ -65,11 +65,11 @@ class Database {
   private readonly startedAt = Date.now();
 
   get isConnected(): boolean {
-    return this.ready;
+    return this.gate.isReady;
   }
 
   health(): { connected: boolean; reconnecting: boolean; server: ServerInfo } {
-    return { connected: this.ready, reconnecting: this.reconnecting, server: this.server };
+    return { connected: this.gate.isReady, reconnecting: this.reconnecting, server: this.server };
   }
 
   // Profiler counters plus live cache state and how long the resource has been
@@ -88,7 +88,7 @@ class Database {
     this.profiler.configure(config.slowQueryMs);
 
     let attempt = 0;
-    while (!this.ready) {
+    while (!this.gate.isReady) {
       attempt++;
       try {
         this.pool = mysql.createPool(config.poolOptions());
@@ -109,7 +109,9 @@ class Database {
         }
 
         const reconnected = this.reconnecting;
-        this.ready = true;
+        // Open the gate (sets ready + releases queued callers) before announcing,
+        // so anything awaiting whenReady() resumes the moment we're connected.
+        this.gate.open();
         printReady({
           server: prettyServer(this.server),
           target: config.target(),
@@ -118,7 +120,6 @@ class Database {
           supportsReturning: this.server.supportsReturning,
           reconnected
         });
-        this.flushWaiters();
         // Let dependent resources react without polling isReady()/ready().
         const event = reconnected ? 'vSQL:reconnected' : 'vSQL:ready';
         logger.debug(`emitting ${event}`);
@@ -156,7 +157,7 @@ class Database {
     if (this.shuttingDown || this.reconnecting) return;
     if (!isFatalConnectionError(err)) return;
     this.reconnecting = true;
-    this.ready = false;
+    this.gate.close();
     logger.warn(`lost database connection (${err.code ?? err.message}); reconnecting...`);
     safeEmit('vSQL:connectionLost', { code: err.code ?? null, message: err.message ?? String(err) });
     const dead = this.pool;
@@ -182,14 +183,7 @@ class Database {
   // Resolves immediately once connected, otherwise queues the caller so queries
   // issued during startup (or a reconnect) wait instead of throwing.
   whenReady(): Promise<void> {
-    if (this.ready) return Promise.resolve();
-    return new Promise((resolve) => this.waiters.push(resolve));
-  }
-
-  private flushWaiters(): void {
-    const pending = this.waiters;
-    this.waiters = [];
-    for (const resolve of pending) resolve();
+    return this.gate.whenReady();
   }
 
   private tuneConnection(conn: any): void {
@@ -384,7 +378,7 @@ class Database {
 
   async shutdown(): Promise<void> {
     this.shuttingDown = true;
-    this.ready = false;
+    this.gate.close();
     if (!this.pool) return;
     logger.info('draining connection pool...');
     try {
