@@ -13,8 +13,8 @@ import { ReadyGate } from './gate';
 import {
   backoff,
   connectionHint,
+  isCacheable,
   isFatalConnectionError,
-  isLockingRead,
   isReadQuery,
   isRetryableError,
   preview,
@@ -236,7 +236,7 @@ class Database {
     shape: (rows: any) => any,
     opts?: QueryOptions
   ): Promise<any> {
-    const cacheable = this.cache.enabled && opts?.cache !== false && isReadQuery(sql) && !isLockingRead(sql);
+    const cacheable = isCacheable(sql, this.cache.enabled, opts?.cache === false);
     const key = cacheable ? this.cache.key(sql, params) : '';
     if (cacheable) {
       const hit = this.cache.get(key);

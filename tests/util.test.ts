@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   backoff,
   connectionHint,
+  isCacheable,
   isFatalConnectionError,
   isLockingRead,
   isReadQuery,
@@ -103,6 +104,30 @@ test('withStatementTimeout wraps per server type and is a no-op when off', () =>
   assert.equal(withStatementTimeout('UPDATE t SET a = 1', 1000, 'mysql'), 'UPDATE t SET a = 1');
   // zero / negative timeout is a no-op
   assert.equal(withStatementTimeout('SELECT 1', 0, 'mariadb'), 'SELECT 1');
+});
+
+test('isCacheable: a plain read with caching on is cacheable', () => {
+  assert.ok(isCacheable('SELECT * FROM players WHERE id = ?', true, false));
+});
+
+test('isCacheable: caching off is never cacheable', () => {
+  assert.ok(!isCacheable('SELECT 1', false, false));
+});
+
+test('isCacheable: a per-call opt-out ({ cache: false }) bypasses the cache', () => {
+  assert.ok(!isCacheable('SELECT 1', true, true));
+});
+
+test('isCacheable: locking reads are never cached even with caching on', () => {
+  assert.ok(!isCacheable('SELECT * FROM t WHERE id = 1 FOR UPDATE', true, false));
+  assert.ok(!isCacheable('SELECT * FROM t FOR SHARE', true, false));
+  assert.ok(!isCacheable('SELECT * FROM t LOCK IN SHARE MODE', true, false));
+});
+
+test('isCacheable: writes are never cached', () => {
+  for (const sql of ['INSERT INTO t VALUES (1)', 'UPDATE t SET a = 1', 'DELETE FROM t']) {
+    assert.ok(!isCacheable(sql, true, false), sql);
+  }
 });
 
 test('preview collapses whitespace and truncates long sql', () => {

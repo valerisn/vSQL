@@ -116,3 +116,13 @@ export function isRetryableError(err: any): boolean {
 export function isLockingRead(sql: string): boolean {
   return /\bfor\s+(?:update|share)\b|\block\s+in\s+share\s+mode\b/i.test(sql);
 }
+
+// Whether a query's result may be served from (and stored in) the result cache.
+// It must be a plain read, with caching enabled, not opted out for this call
+// ({ cache: false }), and not a locking read - locking reads have to reach the
+// server to actually take their row locks, so caching them would silently drop
+// the consistency the caller asked for. Erring toward "not cacheable" is always
+// the safe side: the cost is a server round-trip, never stale data.
+export function isCacheable(sql: string, cacheEnabled: boolean, optedOut: boolean): boolean {
+  return cacheEnabled && !optedOut && isReadQuery(sql) && !isLockingRead(sql);
+}
