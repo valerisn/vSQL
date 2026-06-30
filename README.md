@@ -150,7 +150,8 @@ set vsql_socket ""                 # unix socket / named pipe path (optional)
 | `vsql_migrations_dir` | `migrations` | Migrations directory, relative to the resource. |
 | `vsql_version_check` | `true` | Check GitHub for a newer release on start. |
 | `vsql_version_repo` | `valerisn/vSQL` | `owner/repo` to check against (for forks). |
-| `vsql_compat` | `false` | Claim the `oxmysql` / `ghmattimysql` / `mysql-async` export namespaces so existing scripts route into vSQL. Enable only with those resources removed. |
+| `vsql_compat` | `false` | Claim the `oxmysql` / `ghmattimysql` / `mysql-async` export namespaces so existing scripts route into vSQL. Enable only with those resources removed. See [COMPATIBILITY.md](COMPATIBILITY.md). |
+| `vsql_typecast` | `false` | oxmysql-compatible result casting: dates -> epoch ms, `TINYINT(1)`/`BIT(1)` -> boolean. Override per call with `{ typeCast: true \| false }`. |
 | `vsql_debug` | `0` | `0` off, `1` lifecycle, `2` logs every query with timing. |
 
 </details>
@@ -303,11 +304,16 @@ If you'd rather not touch existing scripts, set `vsql_compat true`. vSQL then an
 
 | Resource | Exports routed |
 |---|---|
-| `oxmysql` | `query`, `execute`, `single`, `scalar`, `prepare`, `insert`, `update`, `transaction`, `rawExecute`, and the `*_async` aliases |
-| `ghmattimysql` | `execute`, `scalar`, `insert`, `transaction`, `query` |
-| `mysql-async` | `mysql_execute`, `mysql_fetch_all`, `mysql_fetch_scalar`, `mysql_insert`, `mysql_transaction` |
+| `oxmysql` | `query`, `single`, `scalar`, `update`, `insert`, `prepare`, `rawExecute`, `transaction`, `store`, `isReady`, `awaitConnection`, `execute`/`fetch` - each as the bare name plus its `_async` and `Sync` variants |
+| `ghmattimysql` | `execute`, `scalar`, `transaction`, `store` (+ their `Sync` variants) |
+| `mysql-async` | `mysql_execute`, `mysql_fetch_all`, `mysql_fetch_scalar`, `mysql_insert`, `mysql_transaction`, `mysql_store` |
 
-So a resource calling `exports.oxmysql.execute(...)` (or `exports['mysql-async'].mysql_fetch_all(...)`) keeps working with no edits. vSQL also emits **`onMySQLReady`** on connect, the signal mysql-async / ESX-legacy scripts wait on.
+This surface mirrors **oxmysql 2.14.1** exactly, including the
+`(query, parameters, cb, invokingResource, isPromise)` calling convention - so a
+resource calling `exports.oxmysql.execute(...)` (or `exports['mysql-async'].mysql_fetch_all(...)`)
+keeps working with no edits. vSQL also emits **`onMySQLReady`** on connect, the
+signal mysql-async / ESX-legacy scripts wait on. Full details and the handful of
+intentional differences are in [COMPATIBILITY.md](COMPATIBILITY.md).
 
 > [!WARNING]
 > Enable `vsql_compat` **only with the original resource removed** (don't run both `oxmysql` and vSQL with compat on) - otherwise two resources fight over the same export namespace. Compat is off by default.
