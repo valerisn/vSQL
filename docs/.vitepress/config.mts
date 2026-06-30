@@ -1,9 +1,10 @@
 import { defineConfig } from 'vitepress';
 
-// Deployed to GitHub Pages at https://valerisn.github.io/vSQL/, so the base
-// path is the repo name. Change `base` if you fork under a different name.
+// Base path differs by host: GitHub Pages serves under /<repo>/, while a root
+// domain (Cloudflare Pages, Netlify, Vercel) serves under /. Default suits
+// GitHub Pages; set DOCS_BASE=/ when deploying to a root domain.
 export default defineConfig({
-  base: '/vSQL/',
+  base: process.env.DOCS_BASE || '/vSQL/',
   title: 'vSQL',
   description: 'High-performance MySQL / MariaDB resource for FiveM',
   lastUpdated: true,

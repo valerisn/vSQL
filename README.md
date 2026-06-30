@@ -1,7 +1,5 @@
 <div align="center">
 
-<img src="assets/logo.svg" alt="vSQL" width="300">
-
 # vSQL
 
 **A modern, high performance MySQL / MariaDB resource for FiveM.**
@@ -28,11 +26,11 @@ vSQL gives you a configurable connection pool, prepared statement and result cac
 
 ## Documentation
 
-📖 **[Full docs site →](https://valerisn.github.io/vSQL/)**
-
 - [Getting started](docs/getting-started.md) — install, configure, first query.
 - [Recipes / cookbook](docs/recipes.md) — copy-paste solutions for common tasks.
 - [Architecture](docs/architecture.md) — how a query flows through vSQL, with a diagram.
+
+> These render right here on GitHub. They're also a [VitePress](https://vitepress.dev) site (`npm run docs:dev`) that can be published to GitHub Pages (workflow included) or any static host — see [docs/README.md](docs/README.md).
 
 ## Contents
 
