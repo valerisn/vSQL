@@ -2,20 +2,40 @@ import { db } from './database';
 import { config } from './config';
 import { logger } from './logger';
 import { invokingResource } from './invoker';
+import {
+  COMPAT_METHODS,
+  CompatMethod,
+  GHMATTI_ALIASES,
+  MYSQL_ASYNC_ALIASES
+} from './compat-surface';
 
 // Crossover compatibility for resources written against other MySQL resources.
 //
 // FiveM implements `exports.<resource>.<method>(...)` as an event named
 // `__cfx_export_<resource>_<method>`; the owning resource answers it with a
 // setter that hands back the function. We answer those events for oxmysql,
-// ghmattimysql and mysql-async ourselves, so scripts that call
-// `exports.oxmysql.execute(...)` (etc.) get routed into vSQL unchanged.
+// ghmattimysql and mysql-async ourselves, reproducing oxmysql 2.14.1's export
+// surface and calling convention so scripts that call `exports.oxmysql.execute(...)`
+// (etc.) route into vSQL unchanged.
+//
+// The convention we mirror: a base export is `(query, parameters, cb,
+// invokingResource = GetInvokingResource(), isPromise?)`. The trailing
+// invokingResource lets a wrapper resource forward the real caller for
+// attribution; isPromise is oxmysql-internal and ignored here. The `_async` /
+// `Sync` variants are `(query, parameters, invokingResource?)` and always return
+// a promise.
 //
 // Opt-in via `vsql_compat` and only with the original resource removed, so two
 // resources aren't both claiming the same export namespace.
 
 type AnyFn = (...args: any[]) => any;
-type Method = 'query' | 'execute' | 'single' | 'scalar' | 'insert' | 'update' | 'prepare' | 'transaction';
+
+// One method's two calling forms: the base (callback-or-promise) export and the
+// always-promise `_async`/`Sync` export.
+interface Handler {
+  base: AnyFn;
+  async: AnyFn;
+}
 
 function bridge(promise: Promise<any>, cb?: any): Promise<any> | void {
   if (typeof cb === 'function') {
@@ -28,25 +48,80 @@ function bridge(promise: Promise<any>, cb?: any): Promise<any> | void {
   return promise;
 }
 
-// (query, params?, cb?) - the shape oxmysql/ghmatti/mysql-async callers use.
-function forward(method: Method): AnyFn {
-  return (query: string, params?: any, cb?: any) => {
-    // Attribute the compat-routed call to its caller, same as a native export.
-    const resource = invokingResource();
-    if (typeof params === 'function') {
-      cb = params;
-      params = undefined;
+// Attribution: an explicit invokingResource argument (a wrapper forwarding the
+// real caller) wins; otherwise read it from the current export call.
+function resolveResource(explicit?: unknown): string | undefined {
+  return (typeof explicit === 'string' && explicit) || invokingResource();
+}
+
+// Forward a method to the matching db.* call, honouring oxmysql's argument shape:
+// a function in the parameters slot is the callback (setCallback semantics).
+function dbForward(method: string): Handler {
+  const opts = (resource?: string) => (resource ? { resource } : undefined);
+  return {
+    base: (query: string, parameters?: any, cb?: any, invoking?: unknown) => {
+      const resource = resolveResource(invoking);
+      const callback = typeof cb === 'function' ? cb : typeof parameters === 'function' ? parameters : undefined;
+      const params = typeof parameters === 'function' ? undefined : parameters;
+      return bridge(db.whenReady().then(() => (db as any)[method](query, params, opts(resource))), callback);
+    },
+    async: (query: string, parameters?: any, invoking?: unknown) => {
+      const resource = resolveResource(invoking);
+      const params = typeof parameters === 'function' ? undefined : parameters;
+      return db.whenReady().then(() => (db as any)[method](query, params, opts(resource)));
     }
-    const opts = resource ? { resource } : undefined;
-    return bridge(db.whenReady().then(() => (db as any)[method](query, params, opts)), cb);
   };
 }
 
+// store: oxmysql's store is a pass-through that returns the query as-is (it never
+// actually caches), so resources that call store() then pass the result back as
+// their query keep working.
+const storeHandler: Handler = {
+  base: (query: string, cb?: any) => {
+    if (typeof cb === 'function') {
+      cb(query);
+      return;
+    }
+    return query;
+  },
+  async: (query: string) => Promise.resolve(query)
+};
+
+const isReadyHandler: Handler = {
+  base: (cb?: any) => (typeof cb === 'function' ? cb(db.isConnected) : db.isConnected),
+  async: () => Promise.resolve(db.isConnected)
+};
+
+const awaitConnectionHandler: Handler = {
+  base: (cb?: any) => bridge(db.whenReady().then(() => true), typeof cb === 'function' ? cb : undefined),
+  async: () => db.whenReady().then(() => true)
+};
+
+// Build the handler for each compat method. execute/fetch alias query, exactly
+// as oxmysql does; rawExecute maps to prepare so array-of-arrays batches work.
+function buildHandlers(): Record<CompatMethod, Handler> {
+  const query = dbForward('query');
+  const handlers: Record<CompatMethod, Handler> = {
+    query,
+    single: dbForward('single'),
+    scalar: dbForward('scalar'),
+    update: dbForward('update'),
+    insert: dbForward('insert'),
+    prepare: dbForward('prepare'),
+    rawExecute: dbForward('prepare'),
+    transaction: dbForward('transaction'),
+    store: storeHandler,
+    isReady: isReadyHandler,
+    awaitConnection: awaitConnectionHandler,
+    execute: query, // alias of query (text protocol)
+    fetch: query // alias of query
+  };
+  return handlers;
+}
+
 // Claim `exports.<resource>.<name>` by answering its export event.
-function registerNamespace(resource: string, map: Record<string, AnyFn>): void {
-  for (const name of Object.keys(map)) {
-    on(`__cfx_export_${resource}_${name}`, (setResult: (fn: AnyFn) => void) => setResult(map[name]));
-  }
+function provide(resource: string, name: string, fn: AnyFn): void {
+  on(`__cfx_export_${resource}_${name}`, (setResult: (fn: AnyFn) => void) => setResult(fn));
 }
 
 export function registerCompat(): void {
@@ -55,43 +130,26 @@ export function registerCompat(): void {
 
   if (!config.compat) return;
 
-  const query = forward('query');
-  const execute = forward('execute');
-  const single = forward('single');
-  const scalar = forward('scalar');
-  const insert = forward('insert');
-  const update = forward('update');
-  const prepare = forward('prepare');
-  const transaction = forward('transaction');
+  const handlers = buildHandlers();
 
-  // oxmysql - method names line up with vSQL, plus its async aliases.
-  registerNamespace('oxmysql', {
-    query,
-    execute,
-    single,
-    scalar,
-    prepare,
-    insert,
-    update,
-    transaction,
-    rawExecute: query,
-    insert_async: insert,
-    update_async: update,
-    scalar_async: scalar,
-    single_async: single
-  });
+  for (const method of COMPAT_METHODS) {
+    const h = handlers[method];
+    // oxmysql namespace: bare, _async, and the deprecated Sync alias.
+    provide('oxmysql', method, h.base);
+    provide('oxmysql', `${method}_async`, h.async);
+    provide('oxmysql', `${method}Sync`, h.async);
 
-  // ghmattimysql - a subset with the same shapes.
-  registerNamespace('ghmattimysql', { execute, scalar, insert, transaction, query });
+    // ghmattimysql: the aliased name plus its deprecated Sync variant.
+    const ghmatti = GHMATTI_ALIASES[method];
+    if (ghmatti) {
+      provide('ghmattimysql', ghmatti, h.base);
+      provide('ghmattimysql', `${ghmatti}Sync`, h.async);
+    }
 
-  // mysql-async - its prefixed export names mapped onto vSQL.
-  registerNamespace('mysql-async', {
-    mysql_execute: update,
-    mysql_fetch_all: query,
-    mysql_fetch_scalar: scalar,
-    mysql_insert: insert,
-    mysql_transaction: transaction
-  });
+    // mysql-async: only the bare prefixed name.
+    const mysqlAsync = MYSQL_ASYNC_ALIASES[method];
+    if (mysqlAsync) provide('mysql-async', mysqlAsync, h.base);
+  }
 
   logger.info('compatibility exports registered for oxmysql / ghmattimysql / mysql-async');
 }
