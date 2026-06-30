@@ -51,17 +51,18 @@ node benchmarks/micro.mjs
 ```
 
 ```
-  bindParams positional                   2,890,470 ops/s      346 ns/op
-  bindParams named                        1,363,471 ops/s      733 ns/op
-  bindParams IN-list expansion            2,795,138 ops/s      358 ns/op
-  isReadQuery                            41,630,933 ops/s       24 ns/op
-  normalizeShape                            721,097 ops/s     1387 ns/op
-  cache get (hit)                         9,211,487 ops/s      109 ns/op
+  bindParams positional                 101,677,682 ops/s       10 ns/op
+  bindParams named                       13,894,910 ops/s       72 ns/op
+  bindParams IN-list expansion            2,556,782 ops/s      391 ns/op
+  isReadQuery                            41,949,124 ops/s       24 ns/op
+  normalizeShape                            677,072 ops/s     1477 ns/op
+  cache get (hit)                         9,250,951 ops/s      108 ns/op
 ```
 
-Per-query overhead is a few hundred nanoseconds (binding) down to tens of
-nanoseconds (read/write classification) - negligible next to a database round
--trip (hundreds of microseconds or more).
+Per-query overhead is tens of nanoseconds for a reused query (binding hits the
+memoised plan) - negligible next to a database round-trip (hundreds of
+microseconds or more). IN-list expansion is the one binding path that can't be
+memoised (the rewritten SQL grows with the array), so it stays a full parse.
 
 ### Side-by-side vs oxmysql (parameter binding)
 
@@ -72,22 +73,26 @@ node benchmarks/vs-oxmysql.mjs
 ```
   operation                                    vSQL              oxmysql  winner
   ---------------------------- -------------------- --------------------  ----------
-  positional (2 params)             3,021,716 ops/s     10,909,825 ops/s  ox 3.61x
-  positional + NULL pad             3,554,829 ops/s      5,515,984 ops/s  ox 1.55x
-  named (:id, :active)              1,385,602 ops/s      6,662,753 ops/s  ox 4.81x
-  IN-list expansion                 2,664,615 ops/s                       (vSQL only)
+  positional (2 params)           100,460,107 ops/s     10,660,890 ops/s  vSQL 9.42x
+  positional + NULL pad            41,665,451 ops/s      4,802,968 ops/s  vSQL 8.67x
+  named (:id, :active)             18,415,087 ops/s      6,442,502 ops/s  vSQL 2.86x
+  IN-list expansion                 2,446,657 ops/s                       (vSQL only)
 ```
 
 This is an honest comparison of the **binding layer only** (both wrap mysql2, so
-once a statement reaches the driver the cost is identical). oxmysql's
-`parseArguments` is faster because it does less: it counts `?` with a regex and
-pads, then defers `@`/`:` conversion to `named-placeholders` and array expansion
-to mysql2. vSQL's `bindParams` is a single quote/comment-aware pass that also
-expands `IN ?` -> `IN (?, ?, ...)` itself and lets `?`, `@name` and `:name` be
-mixed - more work per call, but it's still ~3M ops/s, i.e. a few hundred
-nanoseconds, which is lost in the noise of a network round-trip. The IN-list row
-is vSQL-only: oxmysql leaves `IN ?` for mysql2's text-protocol expansion, so
-there's no comparable parse-layer cost to race against.
+once a statement reaches the driver the cost is identical). vSQL wins because it
+**memoises a binding plan per SQL string** and FiveM reuses the same query
+literals on every call: after the first parse, a positional query hands the SQL
+to the driver untouched and only shapes the values, and a named query reads from
+a pre-compiled template. oxmysql re-parses every call - counting `?` with a regex
+(and running `named-placeholders` for `@`/`:`) each time. The plan stores
+structure only, never values, so binding stays positional and injection-safe.
+The IN-list row is vSQL-only and the one path vSQL can't memoise (the rewritten
+SQL grows with the array); oxmysql leaves `IN ?` for mysql2's text-protocol
+expansion, so there's no comparable parse-layer cost to race against. All of
+these are millions of ops/s either way - the point isn't the absolute speed (a
+network round-trip dwarfs it) but that vSQL's richer parser is no longer the
+price.
 
 > The named row uses `named-placeholders@1.1.6` (the version oxmysql patches);
 > for the `:name` syntax used here the patched and stock builds behave the same.

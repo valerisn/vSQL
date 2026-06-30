@@ -14,17 +14,19 @@ node benchmarks/micro.mjs
 Example output (Node 24, Windows - your numbers will vary by hardware):
 
 ```
-  bindParams positional                   2,992,028 ops/s      334 ns/op
-  bindParams named                        1,302,917 ops/s      768 ns/op
-  bindParams IN-list expansion            2,708,793 ops/s      369 ns/op
-  isReadQuery                            43,552,489 ops/s       23 ns/op
-  normalizeShape                            687,011 ops/s     1456 ns/op
-  cache get (hit)                          9,047,146 ops/s      111 ns/op
+  bindParams positional                 101,677,682 ops/s       10 ns/op
+  bindParams named                       13,894,910 ops/s       72 ns/op
+  bindParams IN-list expansion            2,556,782 ops/s      391 ns/op
+  isReadQuery                            41,949,124 ops/s       24 ns/op
+  normalizeShape                            677,072 ops/s     1477 ns/op
+  cache get (hit)                          9,250,951 ops/s      108 ns/op
 ```
 
-The takeaway: vSQL's per-query overhead is on the order of a few hundred nanoseconds
-(binding) down to tens of nanoseconds (read/write classification) - negligible next to
-a network round-trip to the database, which is typically hundreds of microseconds or more.
+The takeaway: vSQL's per-query overhead is tens of nanoseconds for a reused query
+(parameter binding hits a memoised plan) down to nanoseconds for read/write
+classification - negligible next to a network round-trip to the database, which is
+typically hundreds of microseconds or more. The exception is IN-list expansion, the
+one binding path that can't be memoised (the rewritten SQL grows with the array).
 
 > The `MODULE_TYPELESS_PACKAGE_JSON` warning Node prints when running these is harmless
 > - it just means Node reparses the imported `.ts` files as ES modules. The project stays
