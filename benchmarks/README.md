@@ -11,19 +11,24 @@ classification, query-shape normalization, and cache lookups.
 node benchmarks/micro.mjs
 ```
 
-Example output (your numbers will vary by hardware):
+Example output (Node 24, Windows — your numbers will vary by hardware):
 
 ```
-  bindParams positional                   2,970,633 ops/s      337 ns/op
-  bindParams named                        1,314,215 ops/s      761 ns/op
-  bindParams IN-list expansion            2,769,120 ops/s      361 ns/op
-  isReadQuery                            43,610,229 ops/s       23 ns/op
-  normalizeShape                            653,563 ops/s     1530 ns/op
-  cache get (hit)                         9,584,254 ops/s      104 ns/op
+  bindParams positional                   2,992,028 ops/s      334 ns/op
+  bindParams named                        1,302,917 ops/s      768 ns/op
+  bindParams IN-list expansion            2,708,793 ops/s      369 ns/op
+  isReadQuery                            43,552,489 ops/s       23 ns/op
+  normalizeShape                            687,011 ops/s     1456 ns/op
+  cache get (hit)                          9,047,146 ops/s      111 ns/op
 ```
 
-The takeaway: vSQL's per-query overhead is on the order of hundreds of nanoseconds —
-negligible next to a network round-trip to the database.
+The takeaway: vSQL's per-query overhead is on the order of a few hundred nanoseconds
+(binding) down to tens of nanoseconds (read/write classification) — negligible next to
+a network round-trip to the database, which is typically hundreds of microseconds or more.
+
+> The `MODULE_TYPELESS_PACKAGE_JSON` warning Node prints when running these is harmless
+> — it just means Node reparses the imported `.ts` files as ES modules. The project stays
+> CommonJS on purpose (the bundler and `build.js` rely on it), so the warning is expected.
 
 ## Throughput (real database)
 
