@@ -26,7 +26,7 @@ import { ReplicaSet, ReplicaStatus } from './replicas';
 import {
   backoff,
   connectionHint,
-  isCacheable,
+  isCacheableRead,
   isFatalConnectionError,
   isLockingRead,
   isReadQuery,
@@ -335,9 +335,13 @@ class Database {
     params: Params,
     mode: Mode,
     shape: (rows: any) => any,
+    isRead: boolean,
     opts?: QueryOptions
   ): Promise<any> {
-    const cacheable = isCacheable(sql, this.cache.enabled, opts?.cache === false);
+    // isRead is already known from routing, so don't re-classify here. On a cache
+    // hit this is the whole pre-return cost: cacheability check, key, map get -
+    // no binding, no plan lookup, no round-trip.
+    const cacheable = isCacheableRead(sql, this.cache.enabled, opts?.cache === false, isRead);
     const key = cacheable ? this.cache.key(sql, params) : '';
     if (cacheable) {
       const hit = this.cache.get(key);
@@ -382,25 +386,25 @@ class Database {
   // --- public query API ---------------------------------------------------
 
   async query(sql: string, params?: Params, opts?: QueryOptions): Promise<any> {
-    if (isReadQuery(sql)) return this.read(sql, params, 'query', (rows) => rows, opts);
+    if (isReadQuery(sql)) return this.read(sql, params, 'query', (rows) => rows, true, opts);
     const { rows } = await this.exec(sql, params, 'query', undefined, opts);
     this.invalidate();
     return rows;
   }
 
   async execute(sql: string, params?: Params, opts?: QueryOptions): Promise<any> {
-    if (isReadQuery(sql)) return this.read(sql, params, 'execute', (rows) => rows, opts);
+    if (isReadQuery(sql)) return this.read(sql, params, 'execute', (rows) => rows, true, opts);
     const { rows } = await this.exec(sql, params, 'execute', undefined, opts);
     this.invalidate();
     return rows;
   }
 
   single(sql: string, params?: Params, opts?: QueryOptions): Promise<any> {
-    return this.read(sql, params, 'execute', asSingle, opts);
+    return this.read(sql, params, 'execute', asSingle, isReadQuery(sql), opts);
   }
 
   scalar(sql: string, params?: Params, opts?: QueryOptions): Promise<any> {
-    return this.read(sql, params, 'execute', asScalar, opts);
+    return this.read(sql, params, 'execute', asScalar, isReadQuery(sql), opts);
   }
 
   async insert(sql: string, params?: Params, opts?: QueryOptions): Promise<number> {
@@ -469,7 +473,7 @@ class Database {
     if (Array.isArray(params) && params.length > 0 && params.every((p) => Array.isArray(p))) {
       return this.batch(sql, params as any[][]);
     }
-    if (isReadQuery(sql)) return this.read(sql, params, 'execute', (rows) => rows, opts);
+    if (isReadQuery(sql)) return this.read(sql, params, 'execute', (rows) => rows, true, opts);
     const { rows } = await this.exec(sql, params, 'execute', undefined, opts);
     this.invalidate();
     const header = rows as any;

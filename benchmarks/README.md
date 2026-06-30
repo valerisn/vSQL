@@ -48,6 +48,21 @@ cloned oxmysql repo to exercise oxmysql's exact patched build. The positional an
 IN-list rows always run. Results and interpretation are in
 [`../tests/README.md`](../tests/README.md#side-by-side-vs-oxmysql-parameter-binding).
 
+## Cache hit path
+
+Measures the cost of a result-cache hit against the *actual* leaf modules the
+read path composes, and (with a DB) the round-trip a hit skips.
+
+```bash
+node benchmarks/cache.mjs                                   # CPU-only
+BENCH_DB=mysql://root:pw@localhost:3306/bench node benchmarks/cache.mjs   # + real miss
+```
+
+A hit returns before any binding, plan lookup, or round-trip, so the hit path is
+sub-microsecond (~600 ns) - it is dwarfed by the round-trip it replaces. The real
+end-to-end lever is the hit *rate* and the skipped trip, not shaving nanoseconds
+off an already-fast hit.
+
 ## Throughput (real database)
 
 Measures queries/sec and latency percentiles against a live MySQL/MariaDB, using the

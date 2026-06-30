@@ -4,6 +4,7 @@ import {
   backoff,
   connectionHint,
   isCacheable,
+  isCacheableRead,
   isFatalConnectionError,
   isLockingRead,
   isReadQuery,
@@ -128,6 +129,33 @@ test('isCacheable: writes are never cached', () => {
   for (const sql of ['INSERT INTO t VALUES (1)', 'UPDATE t SET a = 1', 'DELETE FROM t']) {
     assert.ok(!isCacheable(sql, true, false), sql);
   }
+});
+
+test('isCacheableRead matches isCacheable when given the right classification', () => {
+  for (const sql of [
+    'SELECT * FROM t WHERE id = ?',
+    'SELECT * FROM t FOR UPDATE',
+    'UPDATE t SET a = 1',
+    'INSERT INTO t VALUES (1)'
+  ]) {
+    for (const enabled of [true, false]) {
+      for (const optedOut of [true, false]) {
+        const ref = isCacheable(sql, enabled, optedOut);
+        const fast = isCacheableRead(sql, enabled, optedOut, isReadQuery(sql));
+        assert.equal(fast, ref, `${sql} enabled=${enabled} optedOut=${optedOut}`);
+      }
+    }
+  }
+});
+
+test('isCacheableRead trusts the passed classification (no re-parse)', () => {
+  // A locking read is still excluded even when isRead is true.
+  assert.ok(!isCacheableRead('SELECT * FROM t FOR UPDATE', true, false, true));
+  // A plain read is cacheable; the cheap guards short-circuit first.
+  assert.ok(isCacheableRead('SELECT 1', true, false, true));
+  assert.ok(!isCacheableRead('SELECT 1', false, false, true));
+  assert.ok(!isCacheableRead('SELECT 1', true, true, true));
+  assert.ok(!isCacheableRead('SELECT 1', true, false, false));
 });
 
 test('preview collapses whitespace and truncates long sql', () => {

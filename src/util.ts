@@ -124,5 +124,14 @@ export function isLockingRead(sql: string): boolean {
 // the consistency the caller asked for. Erring toward "not cacheable" is always
 // the safe side: the cost is a server round-trip, never stale data.
 export function isCacheable(sql: string, cacheEnabled: boolean, optedOut: boolean): boolean {
-  return cacheEnabled && !optedOut && isReadQuery(sql) && !isLockingRead(sql);
+  return isCacheableRead(sql, cacheEnabled, optedOut, isReadQuery(sql));
+}
+
+// Same decision, but with the read/write classification already known - so the
+// hot read path (which has to classify anyway, to route reads vs writes) doesn't
+// re-run isReadQuery a second time on every cached lookup. The cheap checks are
+// ordered first so a disabled cache or an opt-out short-circuits before the
+// isLockingRead regex.
+export function isCacheableRead(sql: string, cacheEnabled: boolean, optedOut: boolean, isRead: boolean): boolean {
+  return cacheEnabled && !optedOut && isRead && !isLockingRead(sql);
 }
