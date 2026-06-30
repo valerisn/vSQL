@@ -4,10 +4,23 @@ import { migrator } from './migrations';
 
 const C = logger.color;
 
+function formatUptime(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s % 60}s`;
+  return `${s}s`;
+}
+
 function showProfiler(): void {
-  const s = db.profiler.stats();
-  logger.raw(`${C.cyan}[vSQL]${C.reset} profiler  (server: ${db.server.type} ${db.server.version})`);
-  logger.raw(`  queries: ${s.count}   errors: ${s.errors}   cache hits: ${s.cacheHits}   cache size: ${db.cache.size}`);
+  const s = db.stats();
+  logger.raw(
+    `${C.cyan}[vSQL]${C.reset} profiler  (server: ${db.server.type} ${db.server.version}, up ${formatUptime(s.uptimeMs)})`
+  );
+  logger.raw(`  queries: ${s.count}   errors: ${s.errors}   cache hits: ${s.cacheHits}   cache size: ${s.cacheSize}`);
   logger.raw(
     `  latency: avg ${s.avgMs.toFixed(1)}ms   p50 ${s.p50.toFixed(1)}ms   ` +
       `p95 ${s.p95.toFixed(1)}ms   p99 ${s.p99.toFixed(1)}ms`
