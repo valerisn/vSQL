@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/logo.svg" alt="vSQL" width="300">
+
 # vSQL
 
 **A modern, high performance MySQL / MariaDB resource for FiveM.**

@@ -1,0 +1,31 @@
+<svg width="1280" height="640" viewBox="0 0 1280 640" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="vSQL — High-performance MySQL / MariaDB for FiveM">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1220"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7dd3fc"/>
+      <stop offset="1" stop-color="#0891b2"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <!-- subtle accent bar -->
+  <rect x="0" y="0" width="1280" height="6" fill="url(#accent)"/>
+
+  <!-- icon -->
+  <g transform="translate(150,210)">
+    <rect width="220" height="220" rx="48" fill="#0b1324" stroke="#1e293b" stroke-width="2"/>
+    <g transform="translate(62,52)" stroke="url(#accent)" stroke-width="8" fill="none" stroke-linejoin="round">
+      <ellipse cx="48" cy="20" rx="48" ry="18"/>
+      <path d="M0 20 V96 a48 18 0 0 0 96 0 V20"/>
+      <path d="M0 58 a48 18 0 0 0 96 0"/>
+    </g>
+  </g>
+
+  <!-- wordmark + tagline -->
+  <text x="430" y="300" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-size="130" font-weight="800" fill="#e2e8f0">v<tspan fill="url(#accent)">SQL</tspan></text>
+  <text x="436" y="372" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-size="40" font-weight="500" fill="#94a3b8">High-performance MySQL / MariaDB for FiveM</text>
+  <text x="436" y="430" font-family="'Consolas', 'Courier New', monospace" font-size="26" fill="#475569">pool · caching · migrations · profiler · transactions</text>
+</svg>
