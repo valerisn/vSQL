@@ -26,6 +26,14 @@ export interface ServerInfo {
   supportsReturning: boolean;
 }
 
+export interface Health {
+  /** True once the pool is connected and serving queries. */
+  connected: boolean;
+  /** True while a fatal connection loss is being recovered from. */
+  reconnecting: boolean;
+  server: ServerInfo;
+}
+
 export interface SlowEntry {
   sql: string;
   ms: number;
@@ -99,6 +107,8 @@ export interface VSql {
   clearCache(pattern?: string): number;
   getStats(): Stats;
   serverInfo(): ServerInfo;
+  /** Connection/reconnection status plus detected server info. */
+  health(): Health;
   isReady(): boolean;
   ready(): Promise<true>;
   ready(cb: Callback<true>): void;

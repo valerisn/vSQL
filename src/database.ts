@@ -6,7 +6,7 @@ import { bindParams, Params } from './params';
 import { ResultCache } from './cache';
 import { Profiler } from './profiler';
 import { detectServer, ServerInfo } from './server';
-import { backoff, isLockingRead, isReadQuery, preview, sleep } from './util';
+import { backoff, isFatalConnectionError, isLockingRead, isReadQuery, preview, sleep } from './util';
 
 type Mode = 'query' | 'execute';
 
@@ -28,6 +28,8 @@ type TransactionQuery = string | [string, Params] | { query?: string; sql?: stri
 class Database {
   private pool: Pool | null = null;
   private ready = false;
+  private reconnecting = false;
+  private shuttingDown = false;
   private waiters: Array<() => void> = [];
 
   server: ServerInfo = { type: 'unknown', version: '', major: 0, minor: 0, supportsReturning: false };
@@ -36,6 +38,10 @@ class Database {
 
   get isConnected(): boolean {
     return this.ready;
+  }
+
+  health(): { connected: boolean; reconnecting: boolean; server: ServerInfo } {
+    return { connected: this.ready, reconnecting: this.reconnecting, server: this.server };
   }
 
   async start(): Promise<void> {
@@ -47,6 +53,10 @@ class Database {
       try {
         this.pool = mysql.createPool(config.poolOptions());
         this.pool.on('connection', (conn) => this.tuneConnection(conn));
+        // A handler is required so an idle-connection error doesn't crash the
+        // process as an unhandled EventEmitter 'error'; we also use it to kick
+        // off a reconnect when the loss happens outside an in-flight query.
+        (this.pool as any).on('error', (err: any) => this.handleConnectionLoss(err));
 
         const conn = await this.pool.getConnection();
         try {
@@ -80,6 +90,37 @@ class Database {
         await sleep(delay);
       }
     }
+  }
+
+  // Called when a fatal connection error is seen (mid-query or from the pool's
+  // own error event). Drops the dead pool and re-runs start(), whose retry loop
+  // reconnects with backoff. Queries arriving in the meantime queue on
+  // whenReady() until the new pool is up. Guarded so overlapping errors from
+  // several connections only trigger one reconnect.
+  private handleConnectionLoss(err: any): void {
+    if (this.shuttingDown || this.reconnecting) return;
+    if (!isFatalConnectionError(err)) return;
+    this.reconnecting = true;
+    this.ready = false;
+    logger.warn(`lost database connection (${err.code ?? err.message}); reconnecting...`);
+    const dead = this.pool;
+    this.pool = null;
+    void (async () => {
+      if (dead) {
+        try {
+          await dead.end();
+        } catch {
+          /* the pool is already broken; nothing to salvage */
+        }
+      }
+      try {
+        await this.start();
+      } catch (e: any) {
+        logger.error(`reconnect failed: ${e.message}`);
+      } finally {
+        this.reconnecting = false;
+      }
+    })();
   }
 
   // Resolves immediately once connected, otherwise queues the caller so queries
@@ -123,6 +164,7 @@ class Database {
     } catch (err: any) {
       this.profiler.recordError();
       logger.error(`query failed: ${err.message}\n        sql: ${preview(sql)}`);
+      this.handleConnectionLoss(err);
       throw err;
     }
   }
@@ -273,6 +315,7 @@ class Database {
   }
 
   async shutdown(): Promise<void> {
+    this.shuttingDown = true;
     this.ready = false;
     if (!this.pool) return;
     logger.info('draining connection pool...');
