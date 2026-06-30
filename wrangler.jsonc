@@ -1,0 +1,10 @@
+{
+  // Serves the built VitePress docs site as a Cloudflare static-assets Worker.
+  // Only used for hosting the docs — the FiveM resource itself does not need it.
+  // Build first (npm run docs:build), then: npx wrangler deploy
+  "name": "vsql-docs",
+  "compatibility_date": "2025-06-01",
+  "assets": {
+    "directory": "./docs/.vitepress/dist"
+  }
+}
