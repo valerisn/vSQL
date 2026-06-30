@@ -201,7 +201,7 @@ await exports.vSQL.transaction(async (tx) => {
 | `batch` | `(sql, rows[][], cb?)` | Runs the statement once per row in a transaction. Returns total `affectedRows`. |
 | `transaction` | `(queries[] or fn(tx), cb?)` | Atomic, rolls back on error. Returns results array or the callback's return. |
 | `cacheClear` / `clearCache` | `(pattern?)` | Clears the cache (all, or entries whose key contains `pattern`). Returns count. |
-| `getStats` | `()` | Profiler stats `{ count, errors, cacheHits, avgMs, p50, p95, p99, slow[] }`. |
+| `getStats` | `()` | Stats `{ count, errors, cacheHits, avgMs, p50, p95, p99, slow[], cacheEnabled, cacheSize, uptimeMs }`. |
 | `serverInfo` | `()` | `{ type, version, major, minor, supportsReturning }`. |
 | `health` | `()` | `{ connected, reconnecting, server }`, live connection status. |
 | `isReady` | `()` | `boolean`, whether the pool is connected. |

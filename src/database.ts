@@ -4,7 +4,7 @@ import { config } from './config';
 import { logger } from './logger';
 import { bindParams, Params } from './params';
 import { ResultCache } from './cache';
-import { Profiler } from './profiler';
+import { Profiler, ProfilerStats } from './profiler';
 import { detectServer, ServerInfo } from './server';
 import { printReady } from './banner';
 import { backoff, isFatalConnectionError, isLockingRead, isReadQuery, preview, sleep } from './util';
@@ -14,6 +14,14 @@ type Mode = 'query' | 'execute';
 // A queryable target: either the pool itself or a single connection (used for
 // transactions so every statement runs on the same connection).
 type Queryable = Pick<Pool, 'query' | 'execute'>;
+
+// Profiler stats plus the live cache state and resource uptime that the
+// getStats export returns.
+export interface Stats extends ProfilerStats {
+  cacheEnabled: boolean;
+  cacheSize: number;
+  uptimeMs: number;
+}
 
 export interface TransactionApi {
   query(sql: string, params?: Params): Promise<any>;
@@ -36,6 +44,7 @@ class Database {
   server: ServerInfo = { type: 'unknown', version: '', major: 0, minor: 0, supportsReturning: false };
   cache = new ResultCache();
   profiler = new Profiler();
+  private readonly startedAt = Date.now();
 
   get isConnected(): boolean {
     return this.ready;
@@ -43,6 +52,17 @@ class Database {
 
   health(): { connected: boolean; reconnecting: boolean; server: ServerInfo } {
     return { connected: this.ready, reconnecting: this.reconnecting, server: this.server };
+  }
+
+  // Profiler counters plus live cache state and how long the resource has been
+  // running, so a monitor can read everything from a single export.
+  stats(): Stats {
+    return {
+      ...this.profiler.stats(),
+      cacheEnabled: this.cache.enabled,
+      cacheSize: this.cache.size,
+      uptimeMs: Date.now() - this.startedAt
+    };
   }
 
   async start(): Promise<void> {

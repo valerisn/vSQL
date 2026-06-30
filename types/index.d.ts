@@ -49,6 +49,12 @@ export interface Stats {
   p95: number;
   p99: number;
   slow: SlowEntry[];
+  /** Whether result caching is currently enabled. */
+  cacheEnabled: boolean;
+  /** Number of result sets currently held in the cache. */
+  cacheSize: number;
+  /** Milliseconds since the resource started. */
+  uptimeMs: number;
 }
 
 export interface TransactionApi {

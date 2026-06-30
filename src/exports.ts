@@ -63,7 +63,7 @@ export function registerExports(): void {
   // Cache control + observability.
   exports('cacheClear', (pattern?: string) => db.cache.clear(pattern));
   exports('clearCache', (pattern?: string) => db.cache.clear(pattern));
-  exports('getStats', () => db.profiler.stats());
+  exports('getStats', () => db.stats());
   exports('serverInfo', () => db.server);
   exports('health', () => db.health());
   exports('isReady', () => db.isConnected);

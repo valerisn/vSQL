@@ -4,7 +4,7 @@ export interface SlowEntry {
   at: number;
 }
 
-export interface Stats {
+export interface ProfilerStats {
   count: number;
   errors: number;
   cacheHits: number;
@@ -67,7 +67,7 @@ export class Profiler {
     return sorted[idx];
   }
 
-  stats(): Stats {
+  stats(): ProfilerStats {
     return {
       count: this.count,
       errors: this.errors,
