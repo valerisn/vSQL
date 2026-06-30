@@ -8,7 +8,7 @@ Built on [mysql2](https://github.com/sidorares/node-mysql2) with a configurable 
 
 ## Features
 
-- **Connection pool** with automatic reconnection (exponential backoff + jitter) and a startup health check.
+- **Connection pool** with automatic reconnection (exponential backoff + jitter) — at startup and after a mid-session connection loss — plus a `health` export for live status.
 - **Callback and Promise/async APIs** for every export.
 - **`?` positional and `@name` / `:name` named parameters**, plus automatic `IN (?)` array expansion — always bound, never interpolated.
 - **Prepared-statement caching** (mysql2 per-connection LRU) and **optional result caching** (TTL + LRU) with explicit invalidation.
@@ -113,6 +113,7 @@ exports.vSQL.query('SELECT * FROM players', (rows) => { /* ... */ });
 | `cacheClear` / `clearCache` | `(pattern?)` | Clears cache (all, or entries whose key contains `pattern`); returns count. |
 | `getStats` | `()` | Profiler stats `{ count, errors, cacheHits, avgMs, p50, p95, p99, slow[] }`. |
 | `serverInfo` | `()` | `{ type, version, major, minor, supportsReturning }`. |
+| `health` | `()` | `{ connected, reconnecting, server }` — live connection status. |
 | `isReady` | `()` | `boolean` — pool connected. |
 | `ready` | `(cb?)` | Resolves once the pool is connected. |
 
@@ -195,6 +196,7 @@ vSQL/
 ├── migrations/             # 001_*.sql (+ .down.sql), 003_*.js
 ├── examples/               # server.lua, server.js
 ├── types/index.d.ts        # exported type definitions
+├── tests/                  # unit tests (node --test)
 ├── src/                    # TypeScript source
 │   ├── index.ts            # bootstrap / lifecycle
 │   ├── config.ts           # convar parsing
@@ -207,6 +209,19 @@ vSQL/
 │   └── fivem.d.ts
 └── dist/                   # build output (index.js)
 ```
+
+## Development
+
+```bash
+npm install
+npm run typecheck   # tsc --noEmit
+npm test            # node --test (pure modules; no DB needed)
+npm run build       # bundle to dist/index.js
+```
+
+Tests run on the pure modules (parameter binding, query classification,
+caching) and need no database. They use Node's built-in test runner with
+native TypeScript type stripping, so **Node 24+** is required (see `.nvmrc`).
 
 ## License
 
