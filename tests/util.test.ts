@@ -7,7 +7,8 @@ import {
   isLockingRead,
   isReadQuery,
   isRetryableError,
-  preview
+  preview,
+  withStatementTimeout
 } from '../src/util.ts';
 
 test('isReadQuery recognises read statements (incl. leading comments/parens)', () => {
@@ -85,6 +86,23 @@ test('connectionHint maps known codes and stays quiet otherwise', () => {
   assert.equal(connectionHint({ code: 'ER_DUP_ENTRY' }), '');
   assert.equal(connectionHint(null), '');
   assert.equal(connectionHint({}), '');
+});
+
+test('withStatementTimeout wraps per server type and is a no-op when off', () => {
+  // MariaDB: SET STATEMENT ... FOR caps any statement, ms -> seconds
+  assert.equal(
+    withStatementTimeout('UPDATE t SET a = 1', 500, 'mariadb'),
+    'SET STATEMENT max_statement_time=0.5 FOR UPDATE t SET a = 1'
+  );
+  // MySQL: optimizer hint injected into a leading SELECT
+  assert.equal(
+    withStatementTimeout('SELECT * FROM t', 1000, 'mysql'),
+    'SELECT /*+ MAX_EXECUTION_TIME(1000) */ * FROM t'
+  );
+  // MySQL: non-SELECT is left unwrapped (hint only valid in a SELECT)
+  assert.equal(withStatementTimeout('UPDATE t SET a = 1', 1000, 'mysql'), 'UPDATE t SET a = 1');
+  // zero / negative timeout is a no-op
+  assert.equal(withStatementTimeout('SELECT 1', 0, 'mariadb'), 'SELECT 1');
 });
 
 test('preview collapses whitespace and truncates long sql', () => {

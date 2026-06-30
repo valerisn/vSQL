@@ -15,10 +15,19 @@ import {
   isReadQuery,
   isRetryableError,
   preview,
-  sleep
+  sleep,
+  withStatementTimeout
 } from './util';
 
 type Mode = 'query' | 'execute';
+
+/** Per-call overrides, passed as the optional 3rd argument to read/write methods. */
+export interface QueryOptions {
+  /** Server-side statement timeout in ms for this call (see vsql_query_timeout). */
+  timeout?: number;
+  /** Set false to bypass the result cache for this call (always hit the server). */
+  cache?: boolean;
+}
 
 // A queryable target: either the pool itself or a single connection (used for
 // transactions so every statement runs on the same connection).
@@ -191,19 +200,29 @@ class Database {
     }
   }
 
-  private async exec(sql: string, params: Params, mode: Mode, target?: Queryable): Promise<{ rows: any }> {
+  private async exec(
+    sql: string,
+    params: Params,
+    mode: Mode,
+    target?: Queryable,
+    opts?: QueryOptions
+  ): Promise<{ rows: any }> {
     if (!this.pool) throw new Error('vSQL: pool is not initialized');
     const bound = bindParams(sql, params);
+    const text =
+      opts?.timeout && opts.timeout > 0
+        ? withStatementTimeout(bound.sql, opts.timeout, this.server.type)
+        : bound.sql;
     const runner = target ?? this.pool;
     const start = performance.now();
     try {
       const [rows] =
         mode === 'execute'
-          ? await runner.execute(bound.sql, bound.values)
-          : await runner.query(bound.sql, bound.values);
+          ? await runner.execute(text, bound.values)
+          : await runner.query(text, bound.values);
       const ms = performance.now() - start;
       this.profiler.record(sql, ms);
-      logger.query(bound.sql, bound.values, ms);
+      logger.query(text, bound.values, ms);
       if (ms >= config.slowQueryMs) {
         logger.warn(`slow query ${ms.toFixed(1)}ms: ${preview(sql)}`);
       }
@@ -216,8 +235,14 @@ class Database {
     }
   }
 
-  private async read(sql: string, params: Params, mode: Mode, shape: (rows: any) => any): Promise<any> {
-    const cacheable = this.cache.enabled && isReadQuery(sql) && !isLockingRead(sql);
+  private async read(
+    sql: string,
+    params: Params,
+    mode: Mode,
+    shape: (rows: any) => any,
+    opts?: QueryOptions
+  ): Promise<any> {
+    const cacheable = this.cache.enabled && opts?.cache !== false && isReadQuery(sql) && !isLockingRead(sql);
     const key = cacheable ? this.cache.key(sql, params) : '';
     if (cacheable) {
       const hit = this.cache.get(key);
@@ -226,7 +251,7 @@ class Database {
         return hit;
       }
     }
-    const { rows } = await this.exec(sql, params, mode);
+    const { rows } = await this.exec(sql, params, mode, undefined, opts);
     const shaped = shape(rows);
     if (cacheable) this.cache.set(key, shaped);
     return shaped;
@@ -240,53 +265,59 @@ class Database {
 
   // --- public query API ---------------------------------------------------
 
-  async query(sql: string, params?: Params): Promise<any> {
-    if (isReadQuery(sql)) return this.read(sql, params, 'query', (rows) => rows);
-    const { rows } = await this.exec(sql, params, 'query');
+  async query(sql: string, params?: Params, opts?: QueryOptions): Promise<any> {
+    if (isReadQuery(sql)) return this.read(sql, params, 'query', (rows) => rows, opts);
+    const { rows } = await this.exec(sql, params, 'query', undefined, opts);
     this.invalidate();
     return rows;
   }
 
-  async execute(sql: string, params?: Params): Promise<any> {
-    if (isReadQuery(sql)) return this.read(sql, params, 'execute', (rows) => rows);
-    const { rows } = await this.exec(sql, params, 'execute');
+  async execute(sql: string, params?: Params, opts?: QueryOptions): Promise<any> {
+    if (isReadQuery(sql)) return this.read(sql, params, 'execute', (rows) => rows, opts);
+    const { rows } = await this.exec(sql, params, 'execute', undefined, opts);
     this.invalidate();
     return rows;
   }
 
-  single(sql: string, params?: Params): Promise<any> {
-    return this.read(sql, params, 'execute', (rows) => (Array.isArray(rows) ? rows[0] ?? null : null));
+  single(sql: string, params?: Params, opts?: QueryOptions): Promise<any> {
+    return this.read(sql, params, 'execute', (rows) => (Array.isArray(rows) ? rows[0] ?? null : null), opts);
   }
 
-  scalar(sql: string, params?: Params): Promise<any> {
-    return this.read(sql, params, 'execute', (rows) => {
-      const row = Array.isArray(rows) ? rows[0] : undefined;
-      if (!row) return null;
-      const values = Object.values(row);
-      return values.length ? values[0] : null;
-    });
+  scalar(sql: string, params?: Params, opts?: QueryOptions): Promise<any> {
+    return this.read(
+      sql,
+      params,
+      'execute',
+      (rows) => {
+        const row = Array.isArray(rows) ? rows[0] : undefined;
+        if (!row) return null;
+        const values = Object.values(row);
+        return values.length ? values[0] : null;
+      },
+      opts
+    );
   }
 
-  async insert(sql: string, params?: Params): Promise<number> {
-    const { rows } = await this.exec(sql, params, 'execute');
+  async insert(sql: string, params?: Params, opts?: QueryOptions): Promise<number> {
+    const { rows } = await this.exec(sql, params, 'execute', undefined, opts);
     this.invalidate();
     return (rows as any)?.insertId ?? 0;
   }
 
-  async update(sql: string, params?: Params): Promise<number> {
-    const { rows } = await this.exec(sql, params, 'execute');
+  async update(sql: string, params?: Params, opts?: QueryOptions): Promise<number> {
+    const { rows } = await this.exec(sql, params, 'execute', undefined, opts);
     this.invalidate();
     return (rows as any)?.affectedRows ?? 0;
   }
 
   // Batch-aware prepared execution: an array of arrays runs the same statement
   // once per row inside a transaction; otherwise it's a single execute.
-  async prepare(sql: string, params?: Params): Promise<any> {
+  async prepare(sql: string, params?: Params, opts?: QueryOptions): Promise<any> {
     if (Array.isArray(params) && params.length > 0 && params.every((p) => Array.isArray(p))) {
       return this.batch(sql, params as any[][]);
     }
-    if (isReadQuery(sql)) return this.read(sql, params, 'execute', (rows) => rows);
-    const { rows } = await this.exec(sql, params, 'execute');
+    if (isReadQuery(sql)) return this.read(sql, params, 'execute', (rows) => rows, opts);
+    const { rows } = await this.exec(sql, params, 'execute', undefined, opts);
     this.invalidate();
     const header = rows as any;
     return header?.affectedRows ?? header?.insertId ?? rows;

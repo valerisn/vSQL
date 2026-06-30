@@ -174,6 +174,19 @@ await exports.vSQL.query('SELECT * FROM vehicles WHERE plate IN ?', [['AAA111', 
 > [!CAUTION]
 > Pass values through parameters, never by string concatenation. vSQL binds every value, which keeps your queries safe from SQL injection.
 
+### Per-call options
+
+Read/write methods take an optional `{ timeout, cache }` object as a third argument.
+
+```js
+// Skip the result cache for this one read (always hit the server)
+await exports.vSQL.single('SELECT * FROM players WHERE id = ?', [1], { cache: false });
+
+// Cap this statement at 2s server-side (MariaDB caps any statement;
+// MySQL caps read-only SELECTs — see vsql_query_timeout)
+await exports.vSQL.query('SELECT * FROM big_report', [], { timeout: 2000 });
+```
+
 ### Transactions
 
 ```js

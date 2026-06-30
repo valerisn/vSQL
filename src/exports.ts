@@ -18,14 +18,20 @@ function bridge(promise: Promise<any>, cb?: Callback): Promise<any> | void {
 }
 
 export function registerExports(): void {
-  // (sql, params, cb) where params or cb may be omitted.
+  // (sql, params?, opts?, cb?) — params, opts and cb are each optional. A
+  // function in the params or opts slot is treated as the callback; an object in
+  // the 3rd slot is per-call options ({ timeout, cache }).
   const standard = (method: 'query' | 'execute' | 'single' | 'scalar' | 'insert' | 'update' | 'prepare') => {
-    return (sql: string, params?: any, cb?: any) => {
+    return (sql: string, params?: any, optsOrCb?: any, cb?: any) => {
       if (typeof params === 'function') {
         cb = params;
         params = undefined;
+      } else if (typeof optsOrCb === 'function') {
+        cb = optsOrCb;
+        optsOrCb = undefined;
       }
-      return bridge(db.whenReady().then(() => (db as any)[method](sql, params)), cb);
+      const opts = optsOrCb && typeof optsOrCb === 'object' ? optsOrCb : undefined;
+      return bridge(db.whenReady().then(() => (db as any)[method](sql, params, opts)), cb);
     };
   };
 

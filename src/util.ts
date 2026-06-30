@@ -82,6 +82,26 @@ export function connectionHint(err: any): string {
 // which is safe because it was already rolled back whole.
 const RETRYABLE_CODES = new Set(['ER_LOCK_DEADLOCK', 'ER_LOCK_WAIT_TIMEOUT']);
 
+// Wrap a single statement so it is capped server-side for this one call, used
+// by the per-call { timeout } option. MariaDB's `SET STATEMENT ... FOR` caps any
+// statement in one round trip; MySQL only supports the MAX_EXECUTION_TIME
+// optimizer hint, and only inside a leading SELECT (other statements are left
+// unwrapped — use the global vsql_query_timeout there).
+export function withStatementTimeout(
+  sql: string,
+  ms: number,
+  serverType: 'mysql' | 'mariadb' | 'unknown'
+): string {
+  if (!ms || ms <= 0) return sql;
+  if (serverType === 'mariadb') {
+    return `SET STATEMENT max_statement_time=${ms / 1000} FOR ${sql}`;
+  }
+  const lead = sql.match(/^(\s*)(select)\b/i);
+  if (!lead) return sql;
+  const hint = `/*+ MAX_EXECUTION_TIME(${Math.round(ms)}) */`;
+  return `${sql.slice(0, lead[0].length)} ${hint}${sql.slice(lead[0].length)}`;
+}
+
 export function isRetryableError(err: any): boolean {
   if (!err) return false;
   if (typeof err.code === 'string' && RETRYABLE_CODES.has(err.code)) return true;

@@ -11,6 +11,14 @@
 export type Params = any[] | Record<string, any>;
 export type Callback<T> = (result: T, error?: Error) => void;
 
+/** Per-call overrides, passed as the optional 3rd argument to read/write methods. */
+export interface QueryOptions {
+  /** Server-side statement timeout in ms for this call. */
+  timeout?: number;
+  /** Set false to bypass the result cache for this call. */
+  cache?: boolean;
+}
+
 export interface ResultSetHeader {
   affectedRows: number;
   insertId: number;
@@ -82,32 +90,32 @@ export type TransactionQuery =
 
 export interface VSql {
   /** Text-protocol query. Returns rows for reads, a ResultSetHeader for writes. */
-  query<T = any>(sql: string, params?: Params): Promise<T>;
+  query<T = any>(sql: string, params?: Params, opts?: QueryOptions): Promise<T>;
   query<T = any>(sql: string, params: Params, cb: Callback<T>): void;
   query<T = any>(sql: string, cb: Callback<T>): void;
 
   /** Prepared-statement (binary protocol) query. Same shaping as query(). */
-  execute<T = any>(sql: string, params?: Params): Promise<T>;
+  execute<T = any>(sql: string, params?: Params, opts?: QueryOptions): Promise<T>;
   execute<T = any>(sql: string, params: Params, cb: Callback<T>): void;
 
   /** First row, or null. */
-  single<T = any>(sql: string, params?: Params): Promise<T | null>;
+  single<T = any>(sql: string, params?: Params, opts?: QueryOptions): Promise<T | null>;
   single<T = any>(sql: string, params: Params, cb: Callback<T | null>): void;
 
   /** First column of the first row, or null. */
-  scalar<T = any>(sql: string, params?: Params): Promise<T | null>;
+  scalar<T = any>(sql: string, params?: Params, opts?: QueryOptions): Promise<T | null>;
   scalar<T = any>(sql: string, params: Params, cb: Callback<T | null>): void;
 
   /** Returns insertId. */
-  insert(sql: string, params?: Params): Promise<number>;
+  insert(sql: string, params?: Params, opts?: QueryOptions): Promise<number>;
   insert(sql: string, params: Params, cb: Callback<number>): void;
 
   /** Returns affectedRows (works for UPDATE and DELETE). */
-  update(sql: string, params?: Params): Promise<number>;
+  update(sql: string, params?: Params, opts?: QueryOptions): Promise<number>;
   update(sql: string, params: Params, cb: Callback<number>): void;
 
   /** Prepared execute; an array of arrays runs as a batch. */
-  prepare<T = any>(sql: string, params?: Params | any[][]): Promise<T>;
+  prepare<T = any>(sql: string, params?: Params | any[][], opts?: QueryOptions): Promise<T>;
 
   /** Runs the same statement once per row inside a transaction; returns affectedRows. */
   batch(sql: string, rows: any[][]): Promise<number>;
