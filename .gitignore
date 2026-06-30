@@ -2,3 +2,6 @@ node_modules/
 dist/
 *.log
 .DS_Store
+
+# VitePress build cache / output (dist/ above also covers .vitepress/dist)
+docs/.vitepress/cache/
