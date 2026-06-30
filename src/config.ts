@@ -82,6 +82,23 @@ class Config {
     this.versionRepo = str('vsql_version_repo', 'valerisn/vSQL');
   }
 
+  // Plain-language warnings about a configuration that will load but is likely
+  // a mistake. Surfaced once at startup so common misconfigurations are caught
+  // before they turn into confusing query errors later.
+  issues(): string[] {
+    const out: string[] = [];
+    if (!this.base.database) {
+      out.push('no database set (vsql_database / connection string) — queries must fully-qualify table names.');
+    }
+    if (this.poolSize < 1) {
+      out.push(`vsql_pool_size is ${this.poolSize}; it must be at least 1.`);
+    }
+    if (this.maxIdle > this.poolSize) {
+      out.push(`vsql_max_idle (${this.maxIdle}) is above vsql_pool_size (${this.poolSize}); it will be capped to the pool size.`);
+    }
+    return out;
+  }
+
   poolOptions(): PoolOptions {
     return {
       ...this.base,

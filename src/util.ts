@@ -53,6 +53,30 @@ export function isFatalConnectionError(err: any): boolean {
   return typeof err.code === 'string' && FATAL_CONNECTION_CODES.has(err.code);
 }
 
+// Turn a raw driver/socket error into an actionable, plain-language hint so a
+// misconfigured server owner isn't left staring at a bare error code. Returns
+// an empty string when we have nothing useful to add.
+export function connectionHint(err: any): string {
+  const code = typeof err?.code === 'string' ? err.code : '';
+  switch (code) {
+    case 'ECONNREFUSED':
+      return 'the database refused the connection — is it running and are vsql_host/vsql_port correct?';
+    case 'ENOTFOUND':
+      return 'the database host could not be resolved — check vsql_host.';
+    case 'ETIMEDOUT':
+    case 'ECONNRESET':
+      return 'the connection timed out or was reset — check the host, port, and any firewall.';
+    case 'ER_ACCESS_DENIED_ERROR':
+      return 'access denied — check vsql_user and vsql_password.';
+    case 'ER_BAD_DB_ERROR':
+      return 'the database does not exist — check vsql_database.';
+    case 'ER_DBACCESS_DENIED_ERROR':
+      return 'the user lacks access to that database — check the grants for vsql_user.';
+    default:
+      return '';
+  }
+}
+
 // Locking reads (`SELECT ... FOR UPDATE`, `LOCK IN SHARE MODE`, MySQL 8's
 // `FOR SHARE`) acquire row locks and must hit the server every time — serving
 // them from the result cache would silently drop the lock and break the

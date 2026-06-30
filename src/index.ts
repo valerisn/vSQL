@@ -18,6 +18,9 @@ registerCommands();
 printBanner(currentVersion() || '?', config.versionRepo);
 logger.debug(`debug logging level ${config.debug}`);
 
+// Surface likely misconfigurations once, before the pool tries to connect.
+for (const issue of config.issues()) logger.warn(issue);
+
 // Best-effort, fire-and-forget: never let an update check delay the pool coming up.
 void checkVersion();
 

@@ -1,6 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { backoff, isFatalConnectionError, isLockingRead, isReadQuery, preview } from '../src/util.ts';
+import {
+  backoff,
+  connectionHint,
+  isFatalConnectionError,
+  isLockingRead,
+  isReadQuery,
+  preview
+} from '../src/util.ts';
 
 test('isReadQuery recognises read statements (incl. leading comments/parens)', () => {
   for (const sql of [
@@ -59,6 +66,15 @@ test('backoff grows but stays within [0, cap]', () => {
   }
   // With full jitter the floor for a given attempt is half the (capped) window.
   assert.ok(backoff(3, 500, 30_000) >= 1000);
+});
+
+test('connectionHint maps known codes and stays quiet otherwise', () => {
+  assert.match(connectionHint({ code: 'ECONNREFUSED' }), /refused/i);
+  assert.match(connectionHint({ code: 'ER_ACCESS_DENIED_ERROR' }), /access denied/i);
+  assert.match(connectionHint({ code: 'ER_BAD_DB_ERROR' }), /does not exist/i);
+  assert.equal(connectionHint({ code: 'ER_DUP_ENTRY' }), '');
+  assert.equal(connectionHint(null), '');
+  assert.equal(connectionHint({}), '');
 });
 
 test('preview collapses whitespace and truncates long sql', () => {

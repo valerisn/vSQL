@@ -7,7 +7,15 @@ import { ResultCache } from './cache';
 import { Profiler, ProfilerStats } from './profiler';
 import { detectServer, ServerInfo } from './server';
 import { printReady } from './banner';
-import { backoff, isFatalConnectionError, isLockingRead, isReadQuery, preview, sleep } from './util';
+import {
+  backoff,
+  connectionHint,
+  isFatalConnectionError,
+  isLockingRead,
+  isReadQuery,
+  preview,
+  sleep
+} from './util';
 
 type Mode = 'query' | 'execute';
 
@@ -121,6 +129,12 @@ class Database {
         logger.error(
           `connection attempt ${attempt} failed: ${err.message}. retrying in ${(delay / 1000).toFixed(1)}s`
         );
+        // Only on the first failure, so the actionable hint isn't repeated on
+        // every backoff retry.
+        if (attempt === 1) {
+          const hint = connectionHint(err);
+          if (hint) logger.warn(`hint: ${hint}`);
+        }
         await sleep(delay);
       }
     }
