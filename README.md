@@ -117,6 +117,8 @@ set vsql_socket ""                 # unix socket / named pipe path (optional)
 | `vsql_database` | _(empty)_ | Default schema. |
 | `vsql_socket` | _(empty)_ | Unix socket or named pipe path (skips TCP). |
 | `vsql_pool_size` | `8` | Max pool connections. |
+| `vsql_max_idle` | _(pool size)_ | Max idle connections kept open; extras are closed. Set below `vsql_pool_size` to let idle connections drain. |
+| `vsql_idle_timeout` | `60000` | Ms an idle connection lingers before being reaped. |
 | `vsql_connect_timeout` | `30000` | Connection timeout in ms. |
 | `vsql_charset` | `utf8mb4` | Connection charset. |
 | `vsql_collation` | `utf8mb4_unicode_ci` | Session collation. |

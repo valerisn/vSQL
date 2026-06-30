@@ -32,6 +32,8 @@ function bool(name: string, def: boolean): boolean {
 class Config {
   base: BaseConnection = {};
   poolSize = 8;
+  maxIdle = 8; // defaults to poolSize; idle connections beyond this are closed
+  idleTimeout = 60_000; // ms an idle connection lingers before being reaped
   connectTimeout = 30_000;
   charset = 'utf8mb4';
   collation = 'utf8mb4_unicode_ci';
@@ -55,6 +57,8 @@ class Config {
   load(): void {
     this.base = this.parseConnection();
     this.poolSize = int('vsql_pool_size', 8);
+    this.maxIdle = int('vsql_max_idle', this.poolSize);
+    this.idleTimeout = int('vsql_idle_timeout', 60_000);
     this.connectTimeout = int('vsql_connect_timeout', 30_000);
     this.charset = str('vsql_charset', 'utf8mb4');
     this.collation = str('vsql_collation', 'utf8mb4_unicode_ci');
@@ -80,6 +84,8 @@ class Config {
     return {
       ...this.base,
       connectionLimit: this.poolSize,
+      maxIdle: this.maxIdle,
+      idleTimeout: this.idleTimeout,
       connectTimeout: this.connectTimeout,
       charset: this.charset,
       timezone: this.timezone,
