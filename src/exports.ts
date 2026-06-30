@@ -70,6 +70,20 @@ export function registerExports(): void {
     return bridge(db.whenReady().then(() => db.transaction(queries)), cb);
   });
 
+  // Schema introspection.
+  exports('tableExists', (table: string, cb?: any) =>
+    bridge(db.whenReady().then(() => db.tableExists(table)), cb)
+  );
+  exports('columnExists', (table: string, column?: any, cb?: any) => {
+    if (typeof column === 'function') {
+      cb = column;
+      column = undefined;
+    }
+    return bridge(db.whenReady().then(() => db.columnExists(table, column)), cb);
+  });
+  exports('columns', (table: string, cb?: any) => bridge(db.whenReady().then(() => db.listColumns(table)), cb));
+  exports('tables', (cb?: any) => bridge(db.whenReady().then(() => db.listTables()), cb));
+
   // Cache control + observability.
   exports('cacheClear', (pattern?: string) => db.cache.clear(pattern));
   exports('clearCache', (pattern?: string) => db.cache.clear(pattern));

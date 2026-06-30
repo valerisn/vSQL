@@ -78,6 +78,19 @@ export interface Stats {
   uptimeMs: number;
 }
 
+export interface ColumnInfo {
+  /** Column name. */
+  name: string;
+  /** Base data type, e.g. 'int', 'varchar', 'datetime'. */
+  type: string;
+  /** Whether the column accepts NULL. */
+  nullable: boolean;
+  /** Key role: '' | 'PRI' | 'UNI' | 'MUL'. */
+  key: string;
+  /** Declared default, or null. */
+  default: string | null;
+}
+
 export interface ShapeStat {
   /** The query with literals/comments erased, so calls that differ only by values group together. */
   shape: string;
@@ -138,6 +151,19 @@ export interface VSql {
   transaction(queries: TransactionQuery[]): Promise<any[]>;
   transaction<T>(handler: (tx: TransactionApi) => Promise<T>): Promise<T>;
   transaction(queries: TransactionQuery[], cb: Callback<any[]>): void;
+
+  /** Whether a table exists in the connected database. */
+  tableExists(table: string): Promise<boolean>;
+  tableExists(table: string, cb: Callback<boolean>): void;
+  /** Whether a column exists on a table in the connected database. */
+  columnExists(table: string, column: string): Promise<boolean>;
+  columnExists(table: string, column: string, cb: Callback<boolean>): void;
+  /** Column metadata for a table, in ordinal order. */
+  columns(table: string): Promise<ColumnInfo[]>;
+  columns(table: string, cb: Callback<ColumnInfo[]>): void;
+  /** Base-table names in the connected database. */
+  tables(): Promise<string[]>;
+  tables(cb: Callback<string[]>): void;
 
   cacheClear(pattern?: string): number;
   clearCache(pattern?: string): number;

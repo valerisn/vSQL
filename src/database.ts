@@ -8,6 +8,15 @@ import { Profiler, ProfilerStats } from './profiler';
 import { detectServer, ServerInfo } from './server';
 import { printReady } from './banner';
 import { asAffected, asInsertId, asScalar, asSingle, normalizeEntry, TransactionEntry } from './shape';
+import {
+  ColumnInfo,
+  shapeColumns,
+  shapeTables,
+  SQL_COLUMN_EXISTS,
+  SQL_LIST_COLUMNS,
+  SQL_LIST_TABLES,
+  SQL_TABLE_EXISTS
+} from './schema';
 import { castValue } from './typecast';
 import { runAtomic } from './retry';
 import { ReadyGate } from './gate';
@@ -311,6 +320,25 @@ class Database {
     const { rows } = await this.exec(sql, params, 'execute', undefined, opts);
     this.invalidate();
     return asAffected(rows);
+  }
+
+  // --- schema introspection -----------------------------------------------
+  // All scoped to the connected database via DATABASE(); names are bound values.
+
+  async tableExists(table: string): Promise<boolean> {
+    return (await this.scalar(SQL_TABLE_EXISTS, [table])) != null;
+  }
+
+  async columnExists(table: string, column: string): Promise<boolean> {
+    return (await this.scalar(SQL_COLUMN_EXISTS, [table, column])) != null;
+  }
+
+  async listColumns(table: string): Promise<ColumnInfo[]> {
+    return shapeColumns(await this.query(SQL_LIST_COLUMNS, [table]));
+  }
+
+  async listTables(): Promise<string[]> {
+    return shapeTables(await this.query(SQL_LIST_TABLES));
   }
 
   // Batch-aware prepared execution: an array of arrays runs the same statement
