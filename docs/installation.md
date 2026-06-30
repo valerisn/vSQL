@@ -109,9 +109,15 @@ const players = await exports.vSQL.query('SELECT * FROM players WHERE money > ?'
 
 TypeScript users can pull in the published types for autocomplete:
 
+```bash
+npm i -D @vsql/types
+```
+
 ```ts
-import type { VSql } from '@vSQL/types';
+import type { VSql } from '@vsql/types';
 const db = exports.vSQL as unknown as VSql;
+
+const player = await db.findOne<Player>('players', { id });
 ```
 
 ## Updating

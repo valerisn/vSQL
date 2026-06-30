@@ -3,7 +3,7 @@
  *
  * In a TypeScript consumer resource you can treat `exports.vSQL` as a `VSql`:
  *
- *   import type { VSql } from '@vSQL/types';
+ *   import type { VSql } from '@vsql/types';
  *   const db = (global as any).exports.vSQL as VSql;
  *   const users = await db.query<User[]>('SELECT * FROM users WHERE id = ?', [1]);
  */

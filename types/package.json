@@ -1,0 +1,31 @@
+{
+  "name": "@vsql/types",
+  "version": "1.0.0",
+  "description": "TypeScript type definitions for the vSQL FiveM MySQL/MariaDB resource exports.",
+  "license": "MIT",
+  "types": "index.d.ts",
+  "files": [
+    "index.d.ts",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/valerisn/vSQL.git",
+    "directory": "types"
+  },
+  "homepage": "https://github.com/valerisn/vSQL#readme",
+  "bugs": "https://github.com/valerisn/vSQL/issues",
+  "keywords": [
+    "fivem",
+    "fxserver",
+    "mysql",
+    "mariadb",
+    "vsql",
+    "oxmysql",
+    "types",
+    "typescript"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
