@@ -6,6 +6,7 @@ import {
   isFatalConnectionError,
   isLockingRead,
   isReadQuery,
+  isRetryableError,
   preview
 } from '../src/util.ts';
 
@@ -57,6 +58,15 @@ test('isFatalConnectionError honours the fatal flag and known codes', () => {
   assert.ok(!isFatalConnectionError({ code: 'ER_DUP_ENTRY' }));
   assert.ok(!isFatalConnectionError(null));
   assert.ok(!isFatalConnectionError(undefined));
+});
+
+test('isRetryableError matches deadlock / lock-wait by code or errno', () => {
+  assert.ok(isRetryableError({ code: 'ER_LOCK_DEADLOCK' }));
+  assert.ok(isRetryableError({ code: 'ER_LOCK_WAIT_TIMEOUT' }));
+  assert.ok(isRetryableError({ errno: 1213 }));
+  assert.ok(isRetryableError({ errno: 1205 }));
+  assert.ok(!isRetryableError({ code: 'ER_DUP_ENTRY', errno: 1062 }));
+  assert.ok(!isRetryableError(null));
 });
 
 test('backoff grows but stays within [0, cap]', () => {

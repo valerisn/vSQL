@@ -44,6 +44,7 @@ class Config {
 
   debug = 0;
   slowQueryMs = 150;
+  txRetries = 2; // extra attempts for a transaction/batch that hits a deadlock
 
   cacheEnabled = false;
   cacheSize = 500;
@@ -70,6 +71,7 @@ class Config {
 
     this.debug = int('vsql_debug', 0);
     this.slowQueryMs = int('vsql_slow_query_warning', 150);
+    this.txRetries = Math.max(0, int('vsql_tx_retries', 2));
 
     this.cacheEnabled = bool('vsql_cache', false);
     this.cacheSize = int('vsql_cache_size', 500);

@@ -77,6 +77,17 @@ export function connectionHint(err: any): string {
   }
 }
 
+// InnoDB raises these when concurrent transactions contend for the same rows.
+// They aren't bugs in the query — the transaction simply needs to be replayed,
+// which is safe because it was already rolled back whole.
+const RETRYABLE_CODES = new Set(['ER_LOCK_DEADLOCK', 'ER_LOCK_WAIT_TIMEOUT']);
+
+export function isRetryableError(err: any): boolean {
+  if (!err) return false;
+  if (typeof err.code === 'string' && RETRYABLE_CODES.has(err.code)) return true;
+  return err.errno === 1213 || err.errno === 1205; // deadlock / lock wait timeout
+}
+
 // Locking reads (`SELECT ... FOR UPDATE`, `LOCK IN SHARE MODE`, MySQL 8's
 // `FOR SHARE`) acquire row locks and must hit the server every time — serving
 // them from the result cache would silently drop the lock and break the

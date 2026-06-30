@@ -13,6 +13,7 @@ import {
   isFatalConnectionError,
   isLockingRead,
   isReadQuery,
+  isRetryableError,
   preview,
   sleep
 } from './util';
@@ -293,32 +294,19 @@ class Database {
 
   async batch(sql: string, rows: any[][]): Promise<number> {
     if (!Array.isArray(rows) || rows.length === 0) return 0;
-    if (!this.pool) throw new Error('vSQL: pool is not initialized');
-    const conn = await this.pool.getConnection();
-    let affected = 0;
-    try {
-      await conn.beginTransaction();
+    return this.runAtomic(async (conn) => {
+      let affected = 0;
       for (const row of rows) {
         const bound = bindParams(sql, row);
         const [res] = await conn.execute(bound.sql, bound.values);
         affected += (res as any)?.affectedRows ?? 0;
       }
-      await conn.commit();
-    } catch (err) {
-      await conn.rollback();
-      throw err;
-    } finally {
-      conn.release();
-    }
-    this.invalidate();
-    return affected;
+      return affected;
+    });
   }
 
   async transaction(arg: TransactionQuery[] | ((tx: TransactionApi) => Promise<any>)): Promise<any> {
-    if (!this.pool) throw new Error('vSQL: pool is not initialized');
-    const conn = await this.pool.getConnection();
-    try {
-      await conn.beginTransaction();
+    return this.runAtomic(async (conn) => {
       let result: any;
       if (typeof arg === 'function') {
         result = await arg(this.txApi(conn));
@@ -332,15 +320,51 @@ class Database {
       } else {
         throw new Error('vSQL: transaction expects an array of queries or a callback');
       }
-      await conn.commit();
-      this.invalidate();
       return result ?? true;
-    } catch (err) {
-      await conn.rollback();
-      throw err;
-    } finally {
-      conn.release();
+    });
+  }
+
+  // Runs work() inside a single transaction on one pooled connection, retrying
+  // the whole unit when InnoDB reports a deadlock or lock-wait timeout (up to
+  // vsql_tx_retries extra attempts). The transaction is rolled back before each
+  // retry, so replaying is safe for the database; note a callback-form
+  // transaction with side effects *outside* the DB will see those repeated.
+  private async runAtomic<T>(work: (conn: PoolConnection) => Promise<T>): Promise<T> {
+    if (!this.pool) throw new Error('vSQL: pool is not initialized');
+    const attempts = config.txRetries + 1;
+    let lastErr: any;
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      const conn = await this.pool.getConnection();
+      let release = true;
+      try {
+        await conn.beginTransaction();
+        const result = await work(conn);
+        await conn.commit();
+        this.invalidate();
+        return result;
+      } catch (err: any) {
+        try {
+          await conn.rollback();
+        } catch {
+          /* the connection may already be dead; nothing to undo */
+        }
+        lastErr = err;
+        if (attempt < attempts && isRetryableError(err)) {
+          conn.release();
+          release = false;
+          const delay = backoff(attempt, 50, 1000);
+          logger.warn(
+            `transaction conflict (${err.code ?? err.errno}); retry ${attempt}/${attempts - 1} in ${delay}ms`
+          );
+          await sleep(delay);
+          continue;
+        }
+        throw err;
+      } finally {
+        if (release) conn.release();
+      }
     }
+    throw lastErr;
   }
 
   private txApi(conn: PoolConnection): TransactionApi {

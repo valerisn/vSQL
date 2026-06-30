@@ -128,6 +128,7 @@ set vsql_socket ""                 # unix socket / named pipe path (optional)
 | `vsql_query_timeout` | `0` | If greater than 0, caps statement runtime (ms) server-side. MariaDB caps all statements; MySQL only caps read-only `SELECT`s. |
 | `vsql_server_hint` | `auto` | Force server type: `auto`, `mysql`, or `mariadb`. |
 | `vsql_slow_query_warning` | `150` | Slow query threshold in ms. |
+| `vsql_tx_retries` | `2` | Extra attempts for a transaction/batch that hits a deadlock or lock-wait timeout. `0` disables retrying. |
 | `vsql_cache` | `false` | Enable result caching. |
 | `vsql_cache_size` | `500` | Max cached result sets. |
 | `vsql_cache_ttl` | `30000` | Cache entry TTL in ms. |
@@ -190,6 +191,9 @@ await exports.vSQL.transaction(async (tx) => {
   await tx.update('UPDATE accounts SET balance = balance + 100 WHERE id = ?', [2]);
 });
 ```
+
+> [!NOTE]
+> Transactions and `batch` automatically retry on a deadlock or lock-wait timeout (`vsql_tx_retries`, default `2`), since those just need replaying. The unit is rolled back before each retry, so this is safe for the database — but a callback-form transaction with side effects **outside** the database (HTTP calls, events) will see those repeated. Keep such side effects out of the transaction body, or set `vsql_tx_retries 0`.
 
 ## Exports
 
