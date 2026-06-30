@@ -7,13 +7,13 @@ on('app:getVehicles', async (owner) => {
   console.log(`player ${owner} owns ${vehicles.length} vehicle(s)`);
 });
 
-// 2) Batched insert — one prepared statement, many rows, wrapped in a transaction.
+// 2) Batched insert - one prepared statement, many rows, wrapped in a transaction.
 async function importVehicles(owner, list) {
   const affected = await db.batch('INSERT INTO vehicles (plate, owner, model) VALUES (?, ?, ?)', list.map((v) => [v.plate, owner, v.model]));
   return affected;
 }
 
-// 3) Transaction via callback — anything thrown rolls the whole thing back.
+// 3) Transaction via callback - anything thrown rolls the whole thing back.
 async function buyVehicle(buyer, plate, model, price) {
   return db.transaction(async (tx) => {
     const bank = await tx.scalar('SELECT bank FROM players WHERE citizenid = ?', [buyer]);

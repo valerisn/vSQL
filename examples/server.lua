@@ -15,14 +15,14 @@ RegisterNetEvent('app:playerJoined', function(citizenid)
   end
 end)
 
--- 2) Callback style (non-blocking) — useful when you don't want to yield.
+-- 2) Callback style (non-blocking) - useful when you don't want to yield.
 RegisterCommand('mymoney', function(source)
   MySQL.scalar('SELECT bank FROM players WHERE citizenid = ?', { GetPlayerIdentifier(source, 0) }, function(bank)
     TriggerClientEvent('chat:addMessage', source, { args = { 'Bank', ('$%d'):format(bank or 0) } })
   end)
 end, false)
 
--- 3) Atomic money transfer in a transaction — either both rows update or neither.
+-- 3) Atomic money transfer in a transaction - either both rows update or neither.
 local function transfer(fromId, toId, amount)
   return MySQL.transaction.await({
     { 'UPDATE players SET bank = bank - ? WHERE citizenid = ? AND bank >= ?', { amount, fromId, amount } },

@@ -40,7 +40,7 @@ flowchart TD
 | `config.ts` | Parse convars (URL / semicolon / discrete), build `PoolOptions`, session statements, redacted summary, and validation warnings. |
 | `exports.ts` | Register FiveM exports; bridge promise ↔ callback styles; normalize `(sql, params?, opts?, cb?)`. |
 | `database.ts` | The pool, connection lifecycle (connect / reconnect / drain), the query API, transactions + deadlock retry, cache wiring. |
-| `params.ts` | Placeholder binding — `?`, `@name`, `:name`, and `IN (?)` array expansion. Always bound, never interpolated. |
+| `params.ts` | Placeholder binding - `?`, `@name`, `:name`, and `IN (?)` array expansion. Always bound, never interpolated. |
 | `cache.ts` | TTL + LRU result cache with substring invalidation. |
 | `profiler.ts` | Counters, latency ring buffer + percentiles, slow-query log, and per-shape aggregation (`vsql top`). |
 | `util.ts` | Pure helpers: read/write classification, backoff, fatal/retryable error detection, connection hints, statement-timeout wrapping. |
@@ -48,7 +48,7 @@ flowchart TD
 | `migrations.ts` | Discover, checksum, lock, apply / rollback / status. |
 | `commands.ts` | The `vsql` console command and its subcommands. |
 | `version.ts` | Best-effort GitHub release check on startup. |
-| `banner.ts` / `logger.ts` | Console UI — startup banner, status box, tagged/colored logging. |
+| `banner.ts` / `logger.ts` | Console UI - startup banner, status box, tagged/colored logging. |
 
 ## Design choices
 

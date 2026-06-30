@@ -23,14 +23,14 @@ The default `base` (`/vSQL/`) is already correct for `https://<user>.github.io/v
 
 ### Cloudflare Pages / Netlify / Vercel (no GitHub Actions)
 
-These build on their own infrastructure straight from the repo — nothing runs in
+These build on their own infrastructure straight from the repo - nothing runs in
 GitHub Actions, so an Actions/billing hold doesn't matter. Connect the repo and set:
 
 | Setting | Value |
 |---|---|
 | Build command | `npm run docs:build` |
 | Output directory | `docs/.vitepress/dist` |
-| Environment variable | `DOCS_BASE=/` *(root domain — omit for a `/vSQL/` sub-path)* |
+| Environment variable | `DOCS_BASE=/` *(root domain - omit for a `/vSQL/` sub-path)* |
 
 ### Manual / self-hosted
 

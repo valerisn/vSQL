@@ -4,14 +4,14 @@ Reproducible benchmarks for vSQL. Requires **Node 24+** (same as the test suite)
 
 ## Microbenchmarks (no database)
 
-Measures the pure functions that run on every query — parameter binding, read/write
+Measures the pure functions that run on every query - parameter binding, read/write
 classification, query-shape normalization, and cache lookups.
 
 ```bash
 node benchmarks/micro.mjs
 ```
 
-Example output (Node 24, Windows — your numbers will vary by hardware):
+Example output (Node 24, Windows - your numbers will vary by hardware):
 
 ```
   bindParams positional                   2,992,028 ops/s      334 ns/op
@@ -23,11 +23,11 @@ Example output (Node 24, Windows — your numbers will vary by hardware):
 ```
 
 The takeaway: vSQL's per-query overhead is on the order of a few hundred nanoseconds
-(binding) down to tens of nanoseconds (read/write classification) — negligible next to
+(binding) down to tens of nanoseconds (read/write classification) - negligible next to
 a network round-trip to the database, which is typically hundreds of microseconds or more.
 
 > The `MODULE_TYPELESS_PACKAGE_JSON` warning Node prints when running these is harmless
-> — it just means Node reparses the imported `.ts` files as ES modules. The project stays
+> - it just means Node reparses the imported `.ts` files as ES modules. The project stays
 > CommonJS on purpose (the bundler and `build.js` rely on it), so the warning is expected.
 
 ## Throughput (real database)

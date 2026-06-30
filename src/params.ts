@@ -8,8 +8,8 @@ export interface BoundQuery {
 // We parse placeholders ourselves rather than leaning on mysql2's named-param
 // support so that `?`, `@name` and `:name` can all be used (oxmysql accepts a
 // mix), and so we can expand arrays into IN (...) lists. Everything still ends
-// up as positional `?` with values bound by the driver — never string
-// interpolation — so this stays injection-safe.
+// up as positional `?` with values bound by the driver - never string
+// interpolation - so this stays injection-safe.
 export function bindParams(sql: string, params: Params): BoundQuery {
   if (params === undefined || params === null) {
     return { sql, values: [] };

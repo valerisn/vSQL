@@ -5,7 +5,7 @@
 | `logo.svg` | Horizontal lockup (icon + wordmark). Used in the README header. |
 | `icon.svg` | Square icon only. Favicon / avatar / docs logo. |
 | `social-card.svg` | 1280×640 card for the GitHub social preview and link unfurls. |
-| `terminal.svg` | Console showcase — the real startup banner, status panel, and `vsql top` output. Embedded in the README. |
+| `terminal.svg` | Console showcase - the real startup banner, status panel, and `vsql top` output. Embedded in the README. |
 
 Palette: ink `#0f172a`, accent gradient `#7dd3fc → #0891b2`, text `#e2e8f0`.
 

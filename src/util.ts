@@ -1,7 +1,7 @@
 export const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
-// Exponential backoff with full jitter — the jitter matters when several
+// Exponential backoff with full jitter - the jitter matters when several
 // resources (or several pool connections) all reconnect at once after the DB
 // blips, so they don't stampede it in lockstep.
 export function backoff(attempt: number, base = 500, cap = 30_000): number {
@@ -25,7 +25,7 @@ export function isReadQuery(sql: string): boolean {
   if (!READ_LEAD.test(sql)) return false;
   // A `WITH ...` (CTE) statement only reads when its top-level statement is a
   // SELECT. CTE bodies are always SELECT, so a standalone INSERT/UPDATE/DELETE/
-  // REPLACE verb means the statement mutates — e.g. `WITH x AS (...) DELETE ...`.
+  // REPLACE verb means the statement mutates - e.g. `WITH x AS (...) DELETE ...`.
   // Treating it as a write keeps it out of the result cache and makes it
   // invalidate like any other write. Erring toward "write" is the safe side:
   // the worst case is a genuine read needlessly skips the cache.
@@ -60,25 +60,25 @@ export function connectionHint(err: any): string {
   const code = typeof err?.code === 'string' ? err.code : '';
   switch (code) {
     case 'ECONNREFUSED':
-      return 'the database refused the connection — is it running and are vsql_host/vsql_port correct?';
+      return 'the database refused the connection - is it running and are vsql_host/vsql_port correct?';
     case 'ENOTFOUND':
-      return 'the database host could not be resolved — check vsql_host.';
+      return 'the database host could not be resolved - check vsql_host.';
     case 'ETIMEDOUT':
     case 'ECONNRESET':
-      return 'the connection timed out or was reset — check the host, port, and any firewall.';
+      return 'the connection timed out or was reset - check the host, port, and any firewall.';
     case 'ER_ACCESS_DENIED_ERROR':
-      return 'access denied — check vsql_user and vsql_password.';
+      return 'access denied - check vsql_user and vsql_password.';
     case 'ER_BAD_DB_ERROR':
-      return 'the database does not exist — check vsql_database.';
+      return 'the database does not exist - check vsql_database.';
     case 'ER_DBACCESS_DENIED_ERROR':
-      return 'the user lacks access to that database — check the grants for vsql_user.';
+      return 'the user lacks access to that database - check the grants for vsql_user.';
     default:
       return '';
   }
 }
 
 // InnoDB raises these when concurrent transactions contend for the same rows.
-// They aren't bugs in the query — the transaction simply needs to be replayed,
+// They aren't bugs in the query - the transaction simply needs to be replayed,
 // which is safe because it was already rolled back whole.
 const RETRYABLE_CODES = new Set(['ER_LOCK_DEADLOCK', 'ER_LOCK_WAIT_TIMEOUT']);
 
@@ -86,7 +86,7 @@ const RETRYABLE_CODES = new Set(['ER_LOCK_DEADLOCK', 'ER_LOCK_WAIT_TIMEOUT']);
 // by the per-call { timeout } option. MariaDB's `SET STATEMENT ... FOR` caps any
 // statement in one round trip; MySQL only supports the MAX_EXECUTION_TIME
 // optimizer hint, and only inside a leading SELECT (other statements are left
-// unwrapped — use the global vsql_query_timeout there).
+// unwrapped - use the global vsql_query_timeout there).
 export function withStatementTimeout(
   sql: string,
   ms: number,
@@ -109,7 +109,7 @@ export function isRetryableError(err: any): boolean {
 }
 
 // Locking reads (`SELECT ... FOR UPDATE`, `LOCK IN SHARE MODE`, MySQL 8's
-// `FOR SHARE`) acquire row locks and must hit the server every time — serving
+// `FOR SHARE`) acquire row locks and must hit the server every time - serving
 // them from the result cache would silently drop the lock and break the
 // consistency they were asked for. They're still reads, so isReadQuery passes;
 // this guard keeps them out of the cache specifically.

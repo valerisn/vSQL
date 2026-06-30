@@ -10,7 +10,7 @@ npm install
 npm run build      # bundles src into dist/index.js plus type declarations
 ```
 
-> The build output (`dist/`) is generated, not committed — build before first use, or grab a prebuilt zip from the [releases](https://github.com/valerisn/vSQL/releases).
+> The build output (`dist/`) is generated, not committed - build before first use, or grab a prebuilt zip from the [releases](https://github.com/valerisn/vSQL/releases).
 
 ## Configure
 
@@ -43,7 +43,7 @@ dependency 'vSQL'
 shared_script '@vSQL/lib/MySQL.lua'
 ```
 
-Then query — Promise or callback, your choice:
+Then query - Promise or callback, your choice:
 
 ```js
 // Promise

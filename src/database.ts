@@ -435,7 +435,7 @@ function safeEmit(event: string, payload?: any): void {
   try {
     emit(event, payload);
   } catch {
-    /* ignore — an event listener should never break the pool */
+    /* ignore - an event listener should never break the pool */
   }
 }
 

@@ -48,7 +48,7 @@ function showDebug(): void {
   logger.raw(`  ${C.grey}set vsql_debug 2 to log every query with timing.`);
 }
 
-// Heaviest query shapes by total time consumed — the pg_stat_statements view.
+// Heaviest query shapes by total time consumed - the pg_stat_statements view.
 function showTop(limit: number): void {
   const rows = db.profiler.top(limit);
   logger.raw(`${C.cyan}[vSQL]${C.reset} top ${rows.length} query shape(s) by total time`);

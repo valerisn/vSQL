@@ -15,7 +15,7 @@ export interface ProfilerStats {
   slow: SlowEntry[];
 }
 
-/** One aggregated query *shape* — all calls that differ only by literal values. */
+/** One aggregated query *shape* - all calls that differ only by literal values. */
 export interface ShapeStat {
   shape: string;
   count: number;
@@ -99,7 +99,7 @@ export class Profiler {
     if (lightestKey !== undefined) this.shapes.delete(lightestKey);
   }
 
-  // The heaviest query shapes by total time consumed — the ones actually worth
+  // The heaviest query shapes by total time consumed - the ones actually worth
   // optimizing, even when each individual call looks fast.
   top(limit = 10): ShapeStat[] {
     return [...this.shapes.entries()]
@@ -157,7 +157,7 @@ function summarize(sql: string, max = 200): string {
 }
 
 // Reduce a query to its structural shape by erasing the parts that vary between
-// calls — literals, comments, and IN-list lengths — so `WHERE id = 5` and
+// calls - literals, comments, and IN-list lengths - so `WHERE id = 5` and
 // `WHERE id = 9` aggregate together. Exported for tests.
 export function normalizeShape(sql: string, max = 300): string {
   const flat = sql

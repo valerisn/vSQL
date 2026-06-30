@@ -10,7 +10,7 @@ import { printBanner } from './banner';
 const resourceName = GetCurrentResourceName();
 
 // Register everything synchronously at load so other resources can call our
-// exports immediately — calls made before the pool is up queue via whenReady().
+// exports immediately - calls made before the pool is up queue via whenReady().
 config.load();
 registerExports();
 registerCommands();

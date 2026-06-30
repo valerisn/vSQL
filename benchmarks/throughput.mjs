@@ -76,7 +76,7 @@ try {
     await pool.execute('INSERT INTO vsql_bench (name, money) VALUES (?, ?)', [`row${i}`, i]);
   }
 
-  console.log(`\nThroughput benchmark — concurrency ${CONCURRENCY}, ${DURATION_MS}ms per workload`);
+  console.log(`\nThroughput benchmark - concurrency ${CONCURRENCY}, ${DURATION_MS}ms per workload`);
 
   await run('point SELECT by primary key', async () => {
     const id = 1 + Math.floor(Math.random() * 1000);

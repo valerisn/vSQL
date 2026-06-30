@@ -84,7 +84,7 @@ class Config {
     this.versionRepo = str('vsql_version_repo', 'valerisn/vSQL');
   }
 
-  // The connection target for logs — never includes the password.
+  // The connection target for logs - never includes the password.
   target(): string {
     if (this.base.socketPath) return this.base.socketPath;
     return `${this.base.host}:${this.base.port}/${this.base.database || '(none)'}`;
@@ -110,7 +110,7 @@ class Config {
   issues(): string[] {
     const out: string[] = [];
     if (!this.base.database) {
-      out.push('no database set (vsql_database / connection string) — queries must fully-qualify table names.');
+      out.push('no database set (vsql_database / connection string) - queries must fully-qualify table names.');
     }
     if (this.poolSize < 1) {
       out.push(`vsql_pool_size is ${this.poolSize}; it must be at least 1.`);

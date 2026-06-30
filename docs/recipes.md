@@ -3,7 +3,7 @@
 Copy-paste solutions for common tasks. All examples use the JS Promise API
 (`exports.vSQL.*`); the Lua `MySQL.*` wrapper mirrors them.
 
-> Every value is passed as a **parameter** — never concatenate user input into SQL.
+> Every value is passed as a **parameter** - never concatenate user input into SQL.
 
 ## Fetch one / a column / a list
 
@@ -94,7 +94,7 @@ await exports.vSQL.transaction(async (tx) => {
 });
 ```
 
-Transactions auto-retry on deadlock — keep non-DB side effects (HTTP, events) out of the body.
+Transactions auto-retry on deadlock - keep non-DB side effects (HTTP, events) out of the body.
 
 ## Bulk insert (one statement per row, atomic)
 

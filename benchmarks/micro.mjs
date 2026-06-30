@@ -1,4 +1,4 @@
-// Microbenchmarks for vSQL's pure hot-path functions — no database required.
+// Microbenchmarks for vSQL's pure hot-path functions - no database required.
 // These are the bits that run on *every* query (parameter binding, read/write
 // classification, cache lookups, shape normalization), so their cost matters.
 //

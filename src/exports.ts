@@ -18,7 +18,7 @@ function bridge(promise: Promise<any>, cb?: Callback): Promise<any> | void {
 }
 
 export function registerExports(): void {
-  // (sql, params?, opts?, cb?) — params, opts and cb are each optional. A
+  // (sql, params?, opts?, cb?) - params, opts and cb are each optional. A
   // function in the params or opts slot is treated as the callback; an object in
   // the 3rd slot is per-call options ({ timeout, cache }).
   const standard = (method: 'query' | 'execute' | 'single' | 'scalar' | 'insert' | 'update' | 'prepare') => {

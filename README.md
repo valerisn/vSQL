@@ -26,11 +26,11 @@ vSQL gives you a configurable connection pool, prepared statement and result cac
 
 ## Documentation
 
-- [Getting started](docs/getting-started.md) — install, configure, first query.
-- [Recipes / cookbook](docs/recipes.md) — copy-paste solutions for common tasks.
-- [Architecture](docs/architecture.md) — how a query flows through vSQL, with a diagram.
+- [Getting started](docs/getting-started.md) - install, configure, first query.
+- [Recipes / cookbook](docs/recipes.md) - copy-paste solutions for common tasks.
+- [Architecture](docs/architecture.md) - how a query flows through vSQL, with a diagram.
 
-> These render right here on GitHub. They're also a [VitePress](https://vitepress.dev) site (`npm run docs:dev`) that can be published to GitHub Pages (workflow included) or any static host — see [docs/README.md](docs/README.md).
+> These render right here on GitHub. They're also a [VitePress](https://vitepress.dev) site (`npm run docs:dev`) that can be published to GitHub Pages (workflow included) or any static host - see [docs/README.md](docs/README.md).
 
 ## Contents
 
@@ -197,7 +197,7 @@ Read/write methods take an optional `{ timeout, cache }` object as a third argum
 await exports.vSQL.single('SELECT * FROM players WHERE id = ?', [1], { cache: false });
 
 // Cap this statement at 2s server-side (MariaDB caps any statement;
-// MySQL caps read-only SELECTs — see vsql_query_timeout)
+// MySQL caps read-only SELECTs - see vsql_query_timeout)
 await exports.vSQL.query('SELECT * FROM big_report', [], { timeout: 2000 });
 ```
 
@@ -220,7 +220,7 @@ await exports.vSQL.transaction(async (tx) => {
 ```
 
 > [!NOTE]
-> Transactions and `batch` automatically retry on a deadlock or lock-wait timeout (`vsql_tx_retries`, default `2`), since those just need replaying. The unit is rolled back before each retry, so this is safe for the database — but a callback-form transaction with side effects **outside** the database (HTTP calls, events) will see those repeated. Keep such side effects out of the transaction body, or set `vsql_tx_retries 0`.
+> Transactions and `batch` automatically retry on a deadlock or lock-wait timeout (`vsql_tx_retries`, default `2`), since those just need replaying. The unit is rolled back before each retry, so this is safe for the database - but a callback-form transaction with side effects **outside** the database (HTTP calls, events) will see those repeated. Keep such side effects out of the transaction body, or set `vsql_tx_retries 0`.
 
 ## Exports
 

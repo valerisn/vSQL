@@ -35,7 +35,7 @@ class Migrator {
   }
 
   // Migrations get a dedicated connection with multipleStatements enabled so a
-  // single .sql file can hold several statements — the pool deliberately keeps
+  // single .sql file can hold several statements - the pool deliberately keeps
   // that off for normal queries.
   private connect(): Promise<Connection> {
     return mysql.createConnection({ ...config.base, multipleStatements: true });
@@ -185,7 +185,7 @@ class Migrator {
           logger.raw(`  ${logger.color.green}applied${logger.color.reset}  ${file.filename}  (${when})`);
         }
       }
-      // Surface orphaned rows whose file is gone — usually a deleted migration.
+      // Surface orphaned rows whose file is gone - usually a deleted migration.
       for (const version of applied.keys()) {
         if (!files.some((f) => f.version === version)) {
           logger.raw(`  ${logger.color.grey}orphan${logger.color.reset}   version ${version} (no file)`);
