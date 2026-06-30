@@ -72,7 +72,7 @@ npm run build      # bundles src into dist/index.js plus type declarations
 ```
 
 > [!NOTE]
-> The committed resource already ships `dist/index.js`. You only need to rebuild after editing files in `src/`.
+> The build output (`dist/`) is generated, not committed. Run the build above before adding `ensure vSQL`, and again after editing anything in `src/`.
 
 **3.** Configure the connection in `server.cfg` (see [Configuration](#configuration)) and add:
 
