@@ -79,6 +79,8 @@ type Queryable = Pick<Pool, 'query' | 'execute'>;
 export interface Stats extends ProfilerStats {
   cacheEnabled: boolean;
   cacheSize: number;
+  /** Configured max pool connections; compare to peakInFlight for saturation. */
+  poolSize: number;
   uptimeMs: number;
 }
 
@@ -133,6 +135,7 @@ class Database {
       ...this.profiler.stats(),
       cacheEnabled: this.cache.enabled,
       cacheSize: this.cache.size,
+      poolSize: config.poolSize,
       uptimeMs: Date.now() - this.startedAt
     };
   }
@@ -313,6 +316,9 @@ class Database {
         : bound.sql;
     const runner = target ?? this.pool;
     const start = performance.now();
+    // Count the query as in flight across both the pool-acquire wait and the
+    // execution, so peakInFlight reflects real contention for connections.
+    this.profiler.enter();
     try {
       // Per-call typeCast override: when set, pass mysql2 an options object so
       // this one call casts (or doesn't) regardless of the pool default. The
@@ -340,6 +346,8 @@ class Database {
       // takes the replica out of rotation and retries on the primary instead.
       if (!fromReplica) this.handleConnectionLoss(err);
       throw err;
+    } finally {
+      this.profiler.leave();
     }
   }
 

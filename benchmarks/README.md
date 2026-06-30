@@ -77,6 +77,20 @@ Detects the server from `VERSION()`: on MariaDB it times both paths and reports
 the speedup; on MySQL it times the two-trip baseline (the fallback). Run it once
 per engine to compare.
 
+## Pool saturation (latency cliff)
+
+Past the pool size, queries queue for a free connection and tail latency climbs.
+This ramps concurrency against a fixed-size pool and reports throughput +
+p50/p95/p99 at each level.
+
+```bash
+BENCH_DB=mysql://root:pw@localhost:3306/bench BENCH_POOL=8 node benchmarks/saturation.mjs
+```
+
+vSQL surfaces the same pressure live as `peakInFlight` / `poolSize` in
+`getStats()` (and the `vsql` console command flags it when peak exceeds the pool).
+Cap the queue with `vsql_queue_limit` to fast-fail instead of pile up.
+
 ## Throughput (real database)
 
 Measures queries/sec and latency percentiles against a live MySQL/MariaDB, using the

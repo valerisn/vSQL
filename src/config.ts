@@ -35,6 +35,7 @@ class Config {
   poolSize = 8;
   maxIdle = 8; // defaults to poolSize; idle connections beyond this are closed
   idleTimeout = 60_000; // ms an idle connection lingers before being reaped
+  queueLimit = 0; // max queued connection requests; 0 = unbounded (mysql2 default)
   connectTimeout = 30_000;
   charset = 'utf8mb4';
   collation = 'utf8mb4_unicode_ci';
@@ -70,6 +71,7 @@ class Config {
     this.poolSize = int('vsql_pool_size', 8);
     this.maxIdle = int('vsql_max_idle', this.poolSize);
     this.idleTimeout = int('vsql_idle_timeout', 60_000);
+    this.queueLimit = Math.max(0, int('vsql_queue_limit', 0));
     this.connectTimeout = int('vsql_connect_timeout', 30_000);
     this.charset = str('vsql_charset', 'utf8mb4');
     this.collation = str('vsql_collation', 'utf8mb4_unicode_ci');
@@ -138,7 +140,7 @@ class Config {
   summary(): string[] {
     return [
       `target      ${this.target()}`,
-      `pool        size ${this.poolSize}, maxIdle ${this.maxIdle}, idleTimeout ${this.idleTimeout}ms, connectTimeout ${this.connectTimeout}ms`,
+      `pool        size ${this.poolSize}, maxIdle ${this.maxIdle}, idleTimeout ${this.idleTimeout}ms, connectTimeout ${this.connectTimeout}ms, queueLimit ${this.queueLimit || 'unbounded'}`,
       `charset     ${this.charset} / ${this.collation}, timezone ${this.timezone}`,
       `timeouts    wait ${this.waitTimeout || 'default'}, query ${this.queryTimeout ? `${this.queryTimeout}ms` : 'off'}`,
       `cache       ${this.cacheEnabled ? `on (size ${this.cacheSize}, ttl ${this.cacheTtl}ms)` : 'off'}`,
@@ -178,7 +180,7 @@ class Config {
       charset: this.charset,
       timezone: this.timezone,
       waitForConnections: true,
-      queueLimit: 0,
+      queueLimit: this.queueLimit,
       enableKeepAlive: true,
       keepAliveInitialDelay: 10_000,
       multipleStatements: false,

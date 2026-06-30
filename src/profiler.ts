@@ -23,6 +23,10 @@ export interface ProfilerStats {
   p99: number;
   slow: SlowEntry[];
   byResource: ResourceStat[];
+  /** Queries currently in flight (executing or waiting for a pool connection). */
+  inFlight: number;
+  /** Highest concurrent in-flight count seen; compare to the pool size for saturation. */
+  peakInFlight: number;
 }
 
 /** One aggregated query *shape* - all calls that differ only by literal values. */
@@ -50,6 +54,10 @@ export class Profiler {
   count = 0;
   errors = 0;
   cacheHits = 0;
+  // Live in-flight gauge: when peakInFlight climbs well past the pool size, queries
+  // are queueing for a connection - the real latency cliff under load.
+  inFlight = 0;
+  peakInFlight = 0;
   // Slow-query threshold in ms. Configured from the convar at startup rather
   // than read from the global config on every record(), so the profiler has no
   // hidden dependency and can be exercised in isolation.
@@ -171,6 +179,16 @@ export class Profiler {
       .slice(0, limit);
   }
 
+  // Bracket a query (including its wait for a pool connection) with enter()/leave().
+  enter(): void {
+    this.inFlight++;
+    if (this.inFlight > this.peakInFlight) this.peakInFlight = this.inFlight;
+  }
+
+  leave(): void {
+    if (this.inFlight > 0) this.inFlight--;
+  }
+
   recordError(resource?: string): void {
     this.errors++;
     if (resource) this.resourceAgg(resource).errors++;
@@ -200,7 +218,9 @@ export class Profiler {
       p95: this.percentile(95),
       p99: this.percentile(99),
       slow: [...this.slow].reverse().slice(0, 10),
-      byResource: this.byResource(20)
+      byResource: this.byResource(20),
+      inFlight: this.inFlight,
+      peakInFlight: this.peakInFlight
     };
   }
 
@@ -214,6 +234,9 @@ export class Profiler {
     this.slow = [];
     this.shapes.clear();
     this.resources.clear();
+    // Keep the live in-flight count (queries are still running); just reset the
+    // high-water mark to the current level.
+    this.peakInFlight = this.inFlight;
   }
 }
 

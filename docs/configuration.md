@@ -56,6 +56,7 @@ names (`schema.table`). It warns about this once on startup.
 | `vsql_max_idle` | _(pool size)_ | Max idle connections kept open; extras are closed. Set below `vsql_pool_size` to let idle connections drain. |
 | `vsql_idle_timeout` | `60000` | Ms an idle connection lingers before being reaped. |
 | `vsql_connect_timeout` | `30000` | Connection timeout in ms. |
+| `vsql_queue_limit` | `0` | Max requests waiting for a free connection; `0` is unbounded. Set it to fast-fail under extreme load instead of queueing without limit. |
 
 ### Session
 

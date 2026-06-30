@@ -72,6 +72,36 @@ test('normalizeShape erases literals, comments and IN-list length', () => {
   );
 });
 
+test('the in-flight gauge tracks concurrent queries and a high-water mark', () => {
+  const p = new Profiler();
+  p.enter();
+  p.enter();
+  p.enter();
+  assert.equal(p.stats().inFlight, 3);
+  assert.equal(p.stats().peakInFlight, 3);
+  p.leave();
+  p.leave();
+  assert.equal(p.stats().inFlight, 1);
+  assert.equal(p.stats().peakInFlight, 3); // peak stays at the high-water mark
+});
+
+test('leave() never drives the in-flight count negative', () => {
+  const p = new Profiler();
+  p.leave();
+  p.leave();
+  assert.equal(p.stats().inFlight, 0);
+});
+
+test('reset() keeps the live in-flight count but lowers the peak to it', () => {
+  const p = new Profiler();
+  p.enter();
+  p.enter(); // peak 2, inFlight 2
+  p.leave(); // inFlight 1
+  p.reset();
+  assert.equal(p.stats().inFlight, 1); // a query is still running
+  assert.equal(p.stats().peakInFlight, 1); // high-water reset to current
+});
+
 test('byResource attributes count and total time to the calling resource', () => {
   const p = new Profiler();
   p.record('SELECT 1', 10, 'esx_banking');

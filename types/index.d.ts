@@ -85,10 +85,16 @@ export interface Stats {
   slow: SlowEntry[];
   /** Query activity broken down by calling resource, heaviest first. */
   byResource: ResourceStat[];
+  /** Queries currently in flight (executing or waiting for a pool connection). */
+  inFlight: number;
+  /** Highest concurrent in-flight count seen; compare to poolSize for saturation. */
+  peakInFlight: number;
   /** Whether result caching is currently enabled. */
   cacheEnabled: boolean;
   /** Number of result sets currently held in the cache. */
   cacheSize: number;
+  /** Configured max pool connections. */
+  poolSize: number;
   /** Milliseconds since the resource started. */
   uptimeMs: number;
 }
