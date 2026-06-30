@@ -246,6 +246,7 @@ Run these from the server console.
 
 ```
 vsql                     # show profiler stats
+vsql debug               # dump diagnostics (redacted config, server, pool, cache)
 vsql migrate             # apply pending migrations
 vsql migrate:status      # show applied / pending / modified
 vsql migrate:dry         # dry run (show what would apply)

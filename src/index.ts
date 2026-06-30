@@ -17,6 +17,9 @@ registerCommands();
 
 printBanner(currentVersion() || '?', config.versionRepo);
 logger.debug(`debug logging level ${config.debug}`);
+// At debug >= 1, dump the effective (password-redacted) settings so issues are
+// diagnosable from the console log alone.
+for (const lineText of config.summary()) logger.debug(lineText);
 
 // Surface likely misconfigurations once, before the pool tries to connect.
 for (const issue of config.issues()) logger.warn(issue);

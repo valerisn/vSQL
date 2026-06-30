@@ -82,6 +82,26 @@ class Config {
     this.versionRepo = str('vsql_version_repo', 'valerisn/vSQL');
   }
 
+  // The connection target for logs — never includes the password.
+  target(): string {
+    if (this.base.socketPath) return this.base.socketPath;
+    return `${this.base.host}:${this.base.port}/${this.base.database || '(none)'}`;
+  }
+
+  // A redacted, human-readable view of the effective settings, for the startup
+  // debug log and the `vsql debug` command. Deliberately omits the password.
+  summary(): string[] {
+    return [
+      `target      ${this.target()}`,
+      `pool        size ${this.poolSize}, maxIdle ${this.maxIdle}, idleTimeout ${this.idleTimeout}ms, connectTimeout ${this.connectTimeout}ms`,
+      `charset     ${this.charset} / ${this.collation}, timezone ${this.timezone}`,
+      `timeouts    wait ${this.waitTimeout || 'default'}, query ${this.queryTimeout ? `${this.queryTimeout}ms` : 'off'}`,
+      `cache       ${this.cacheEnabled ? `on (size ${this.cacheSize}, ttl ${this.cacheTtl}ms)` : 'off'}`,
+      `migrations  ${this.autoMigrate ? 'on' : 'off'} (${this.migrationsDir})`,
+      `serverHint  ${this.serverHint}, slowQuery ${this.slowQueryMs}ms, debug ${this.debug}`
+    ];
+  }
+
   // Plain-language warnings about a configuration that will load but is likely
   // a mistake. Surfaced once at startup so common misconfigurations are caught
   // before they turn into confusing query errors later.

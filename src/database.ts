@@ -100,12 +100,9 @@ class Database {
 
         const reconnected = this.reconnecting;
         this.ready = true;
-        const target = config.base.socketPath
-          ? config.base.socketPath
-          : `${config.base.host}:${config.base.port}/${config.base.database}`;
         printReady({
           server: prettyServer(this.server),
-          target,
+          target: config.target(),
           pool: config.poolSize,
           cacheEnabled: config.cacheEnabled,
           supportsReturning: this.server.supportsReturning,

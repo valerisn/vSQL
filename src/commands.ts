@@ -1,6 +1,8 @@
+import { config } from './config';
 import { db } from './database';
 import { logger } from './logger';
 import { migrator } from './migrations';
+import { currentVersion } from './version';
 
 const C = logger.color;
 
@@ -29,6 +31,21 @@ function showProfiler(): void {
     logger.raw(`  ${C.yellow}slowest recent queries:${C.reset}`);
     for (const q of s.slow) logger.raw(`    ${q.ms.toFixed(1)}ms  ${q.sql}`);
   }
+}
+
+// Full diagnostic dump for bug reports / support. Password is never included
+// (config.summary() is already redacted).
+function showDebug(): void {
+  const h = db.health();
+  const s = db.stats();
+  const state = h.connected ? `${C.green}connected` : h.reconnecting ? `${C.yellow}reconnecting` : `${C.red}down`;
+  logger.raw(`${C.cyan}[vSQL]${C.reset} debug  (v${currentVersion() || '?'})`);
+  logger.raw(`  state       ${state}${C.reset}`);
+  logger.raw(`  server      ${db.server.type} ${db.server.version || '?'} (RETURNING ${db.server.supportsReturning ? 'yes' : 'no'})`);
+  for (const lineText of config.summary()) logger.raw(`  ${lineText}`);
+  logger.raw(`  live cache  ${s.cacheSize} entr${s.cacheSize === 1 ? 'y' : 'ies'}`);
+  logger.raw(`  queries     ${s.count} (errors ${s.errors}, cache hits ${s.cacheHits}), up ${formatUptime(s.uptimeMs)}`);
+  logger.raw(`  ${C.grey}set vsql_debug 2 to log every query with timing.`);
 }
 
 export function registerCommands(): void {
@@ -62,12 +79,15 @@ export function registerCommands(): void {
                 logger.info(`cache ${db.cache.enabled ? 'enabled' : 'disabled'}, ${db.cache.size} entries`);
               }
               break;
+            case 'debug':
+              showDebug();
+              break;
             case 'reset':
               db.profiler.reset();
               logger.info('profiler stats reset');
               break;
             default:
-              logger.warn(`unknown subcommand "${cmd}". try: vsql | vsql migrate[:status|:rollback|:dry] | vsql cache clear`);
+              logger.warn(`unknown subcommand "${cmd}". try: vsql | vsql debug | vsql migrate[:status|:rollback|:dry] | vsql cache clear`);
           }
         } catch (err: any) {
           logger.error(err.message);
