@@ -1,0 +1,66 @@
+name: Bug report
+description: Report something that is not working as expected
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. Please fill in the sections below so we can reproduce it quickly.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Preflight checklist
+      options:
+        - label: I am running the latest version of vSQL.
+          required: true
+        - label: I searched existing issues and did not find a duplicate.
+          required: true
+        - label: This is not a security vulnerability (those are reported privately, see SECURITY.md).
+          required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug, including what you expected to happen.
+      placeholder: When I call exports.vSQL.query(...), I expected X but got Y.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Ideally a minimal example. Include the query and parameters where relevant.
+      placeholder: |
+        1. Configure ...
+        2. Call ...
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console output
+      description: Any error output from the server console. Set vsql_debug 2 for query level detail.
+      render: shell
+  - type: input
+    id: db-version
+    attributes:
+      label: Database version
+      description: MySQL or MariaDB version.
+      placeholder: MariaDB 10.11.6
+    validations:
+      required: true
+  - type: input
+    id: vsql-version
+    attributes:
+      label: vSQL version or commit
+      placeholder: 1.0.0 or commit hash
+    validations:
+      required: true
+  - type: textarea
+    id: convars
+    attributes:
+      label: Relevant convars
+      description: The vsql_* settings from your server.cfg. Remove any passwords.
+      render: cfg
