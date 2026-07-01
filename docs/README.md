@@ -1,6 +1,7 @@
 # Docs
 
-The Markdown here renders on GitHub as-is, and also powers a [VitePress](https://vitepress.dev) site.
+The Markdown in here renders on GitHub as-is, and the same files build into a
+[VitePress](https://vitepress.dev) site.
 
 ```bash
 npm run docs:dev       # local preview at http://localhost:5173
@@ -10,7 +11,7 @@ npm run docs:preview    # serve the built site locally
 
 ## Deploying
 
-The site is just static files, so it can go on any host. Pick one:
+The built site is just static files, so it'll go anywhere. Pick whichever fits:
 
 ### GitHub Pages (uses GitHub Actions)
 
@@ -23,7 +24,7 @@ The default `base` (`/vSQL/`) is already correct for `https://<user>.github.io/v
 
 ### Cloudflare Pages / Netlify / Vercel (no GitHub Actions)
 
-These build on their own infrastructure straight from the repo - nothing runs in
+These build on their own infrastructure straight from the repo - nothing touches
 GitHub Actions, so an Actions/billing hold doesn't matter. Connect the repo and set:
 
 | Setting | Value |

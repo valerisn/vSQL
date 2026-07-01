@@ -1,8 +1,8 @@
 # Compatibility
 
-vSQL can stand in for the common FiveM MySQL resources, so existing scripts run
-unchanged. This page is the practical summary; the exhaustive reference (matched
-against **oxmysql 2.14.1**) lives in
+vSQL can stand in for the common FiveM MySQL resources, so your existing scripts
+keep running untouched. This page is the practical version; the exhaustive
+reference (matched against **oxmysql 2.14.1**) lives in
 [COMPATIBILITY.md](https://github.com/valerisn/vSQL/blob/main/COMPATIBILITY.md).
 
 ## Turning it on
@@ -90,8 +90,8 @@ You can also override it per call with `{ typeCast: true | false }`.
 ## No dependency patches needed
 
 oxmysql ships `.patch` files for `mysql2` and `named-placeholders`. vSQL needs
-none of them - it gets the important behaviours (`undefined` → `NULL`, `@`/`:`
-named params with quote-safety, `IN (?)` expansion) from its own parser, so they
-survive `npm install` and driver upgrades without a postinstall patch step. The
+none of them - it does the important behaviours (`undefined` → `NULL`, `@`/`:`
+named params with quote-safety, `IN (?)` expansion) in its own parser, so they
+survive `npm install` and driver upgrades with no postinstall patch step. The
 [full reference](https://github.com/valerisn/vSQL/blob/main/COMPATIBILITY.md)
-goes patch-by-patch.
+walks it patch-by-patch.
