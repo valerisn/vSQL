@@ -57,25 +57,16 @@ export interface QueryOptions {
   returning?: string[];
   /** The id column used by insertAndFetch's MySQL fallback SELECT (default 'id'). */
   idColumn?: string;
-  /**
-   * Override oxmysql-compatible type-casting for this call: true forces it on,
-   * false forces it off, regardless of the vsql_typecast default.
-   */
+  /** Force type-casting on/off for this call, ignoring the vsql_typecast default. */
   typeCast?: boolean;
-  /**
-   * Internal: the resource that invoked the export, captured by the export layer
-   * via GetInvokingResource() for per-resource profiling. Not part of the public
-   * call options - callers don't set this.
-   */
+  /** Internal: the invoking resource, set by the export layer for profiling. */
   resource?: string;
 }
 
-// A queryable target: either the pool itself or a single connection (used for
-// transactions so every statement runs on the same connection).
+// The pool, or one connection (transactions pin every statement to the same one).
 type Queryable = Pick<Pool, 'query' | 'execute'>;
 
-// Profiler stats plus the live cache state and resource uptime that the
-// getStats export returns.
+// What getStats returns: profiler stats plus live cache state and uptime.
 export interface Stats extends ProfilerStats {
   cacheEnabled: boolean;
   cacheSize: number;
@@ -128,8 +119,7 @@ class Database {
     };
   }
 
-  // Profiler counters plus live cache state and how long the resource has been
-  // running, so a monitor can read everything from a single export.
+  // Everything a monitor needs from one export.
   stats(): Stats {
     return {
       ...this.profiler.stats(),
@@ -152,16 +142,16 @@ class Database {
       try {
         this.pool = mysql.createPool(config.poolOptions());
         this.pool.on('connection', (conn) => this.tuneConnection(conn));
-        // A handler is required so an idle-connection error doesn't crash the
-        // process as an unhandled EventEmitter 'error'; we also use it to kick
-        // off a reconnect when the loss happens outside an in-flight query.
+        // Needed so an idle-connection error doesn't crash the process as an
+        // unhandled 'error'. Doubles as the reconnect trigger for losses that
+        // happen outside an in-flight query.
         (this.pool as any).on('error', (err: any) => this.handleConnectionLoss(err));
 
         const conn = await this.pool.getConnection();
         try {
           this.server = await detectServer(conn, config.serverHint);
-          // This connection tuned before we knew the server type; re-tune it now
-          // so server-specific session setup (e.g. statement timeout) applies.
+          // First tune ran before we knew the server type; redo it now that
+          // server-specific session setup applies.
           this.tuneConnection(conn);
         } finally {
           conn.release();
@@ -170,8 +160,8 @@ class Database {
         const reconnected = this.reconnecting;
         this.breaker.onSuccess();
         this.connectedOnce = true;
-        // Open the gate (sets ready + releases queued callers) before announcing,
-        // so anything awaiting whenReady() resumes the moment we're connected.
+        // Open the gate (releases queued callers) before announcing, so anything
+        // awaiting whenReady() resumes the instant we're connected.
         this.gate.open();
         printReady({
           server: prettyServer(this.server),
@@ -181,7 +171,7 @@ class Database {
           supportsReturning: this.server.supportsReturning,
           reconnected
         });
-        // Let dependent resources react without polling isReady()/ready().
+        // So dependent resources can react without polling isReady().
         const event = reconnected ? 'vSQL:reconnected' : 'vSQL:ready';
         logger.debug(`emitting ${event}`);
         safeEmit(event, this.server);
@@ -195,9 +185,9 @@ class Database {
           this.pool = null;
         }
         this.breaker.onFailure();
-        // Once we've connected before, a prolonged outage trips the breaker: stop
-        // hanging callers and reject anyone already queued with a clear error. The
-        // reconnect loop keeps probing regardless.
+        // If we'd connected before and the outage trips the breaker, reject the
+        // queued callers with a clear error rather than hang them. The retry loop
+        // keeps probing regardless.
         if (this.connectedOnce && this.breaker.isOpen()) {
           this.gate.fail(new Error('vSQL: database unavailable (circuit breaker open)'));
         }
@@ -205,8 +195,7 @@ class Database {
         logger.error(
           `connection attempt ${attempt} failed: ${err.message}. retrying in ${(delay / 1000).toFixed(1)}s`
         );
-        // Only on the first failure, so the actionable hint isn't repeated on
-        // every backoff retry.
+        // First failure only, so the hint doesn't repeat on every retry.
         if (attempt === 1) {
           const hint = connectionHint(err);
           if (hint) logger.warn(`hint: ${hint}`);
@@ -216,11 +205,10 @@ class Database {
     }
   }
 
-  // Called when a fatal connection error is seen (mid-query or from the pool's
-  // own error event). Drops the dead pool and re-runs start(), whose retry loop
-  // reconnects with backoff. Queries arriving in the meantime queue on
-  // whenReady() until the new pool is up. Guarded so overlapping errors from
-  // several connections only trigger one reconnect.
+  // On a fatal connection error (mid-query or from the pool's error event), drop
+  // the dead pool and re-run start(), which reconnects with backoff. Queries in
+  // the meantime queue on whenReady(). Guarded so overlapping errors from several
+  // connections only trigger one reconnect.
   private handleConnectionLoss(err: any): void {
     if (this.shuttingDown || this.reconnecting) return;
     if (!isFatalConnectionError(err)) return;
@@ -248,10 +236,9 @@ class Database {
     })();
   }
 
-  // Resolves immediately once connected, otherwise queues the caller so queries
-  // issued during startup (or a reconnect) wait instead of throwing. If the
-  // breaker has tripped (a sustained outage after we'd connected before), fail
-  // fast instead of queueing, so dependent resources get a prompt error.
+  // Resolves at once if connected; otherwise queues the caller so queries during
+  // startup or a reconnect wait instead of throwing. If the breaker has tripped,
+  // fail fast instead so callers get a prompt error.
   whenReady(): Promise<void> {
     if (this.gate.isReady) return Promise.resolve();
     if (this.connectedOnce && this.breaker.isOpen()) {
@@ -260,9 +247,9 @@ class Database {
     return this.gate.whenReady();
   }
 
-  // Build the read-replica pools once (start() may run again on reconnect). Each
-  // replica is an independent pool; their health is tracked lazily by ReplicaSet
-  // rather than a connect handshake, so a replica being down never blocks startup.
+  // Build the replica pools once (start() may re-run on reconnect). Health is
+  // tracked lazily by ReplicaSet, not a connect handshake, so a down replica
+  // never blocks startup.
   private setupReplicas(): void {
     if (this.replicasReady) return;
     this.replicasReady = true;
@@ -273,8 +260,8 @@ class Database {
       try {
         const pool = mysql.createPool(config.poolOptions(conn));
         pool.on('connection', (c) => this.tuneConnection(c));
-        // Swallow idle-connection errors; query-time failures are handled by the
-        // read path (mark down + fall back to primary).
+        // Swallow idle errors; the read path handles query-time failures (mark
+        // the replica down, fall back to primary).
         (pool as any).on('error', () => {});
         this.replicas.add(pool, label);
       } catch (err: any) {
@@ -284,9 +271,8 @@ class Database {
     if (this.replicas.size > 0) logger.info(`read replicas: ${this.replicas.size} configured`);
   }
 
-  // The pool a read should run on: a healthy replica when one is available, else
-  // the primary. Locking reads (FOR UPDATE / SHARE) always go to the primary -
-  // they take row locks and need read-after-write consistency.
+  // Which pool a read runs on: a healthy replica if there is one, else primary.
+  // Locking reads always take the primary - they need read-after-write consistency.
   private readTarget(sql: string): Pool | undefined {
     if (this.replicas.size === 0 || isLockingRead(sql)) return undefined;
     return this.replicas.next();
@@ -316,13 +302,12 @@ class Database {
         : bound.sql;
     const runner = target ?? this.pool;
     const start = performance.now();
-    // Count the query as in flight across both the pool-acquire wait and the
-    // execution, so peakInFlight reflects real contention for connections.
+    // In flight across both the connection wait and the execution, so peakInFlight
+    // reflects real contention.
     this.profiler.enter();
     try {
-      // Per-call typeCast override: when set, pass mysql2 an options object so
-      // this one call casts (or doesn't) regardless of the pool default. The
-      // common path (no override) keeps the plain (sql, values) call unchanged.
+      // With a per-call typeCast override, hand mysql2 an options object; the
+      // common no-override path keeps the plain (sql, values) call.
       const [rows] =
         opts?.typeCast !== undefined
           ? mode === 'execute'
@@ -342,8 +327,8 @@ class Database {
     } catch (err: any) {
       this.profiler.recordError(opts?.resource);
       logger.error(`query failed: ${err.message}\n        sql: ${preview(sql)}`);
-      // A replica failure must not trigger a *primary* reconnect; the read path
-      // takes the replica out of rotation and retries on the primary instead.
+      // A replica failure must not reconnect the primary; the read path drops the
+      // replica and retries on the primary itself.
       if (!fromReplica) this.handleConnectionLoss(err);
       throw err;
     } finally {
@@ -359,9 +344,8 @@ class Database {
     isRead: boolean,
     opts?: QueryOptions
   ): Promise<any> {
-    // isRead is already known from routing, so don't re-classify here. On a cache
-    // hit this is the whole pre-return cost: cacheability check, key, map get -
-    // no binding, no plan lookup, no round-trip.
+    // isRead came from routing - don't re-classify. On a hit this is the whole
+    // cost before returning: cacheability check, key, map get. No binding, no trip.
     const cacheable = isCacheableRead(sql, this.cache.enabled, opts?.cache === false, isRead);
     const key = cacheable ? this.cache.key(sql, params) : '';
     if (cacheable) {
@@ -377,9 +361,8 @@ class Database {
     return shaped;
   }
 
-  // Run a read on a healthy replica when available, falling back to the primary
-  // if there's no replica or the chosen one fails with a connection error (it's
-  // then taken out of rotation for a cooldown).
+  // Read from a healthy replica if there is one, else the primary. If the chosen
+  // replica fails on a connection error, mark it down and retry on the primary.
   private async runRead(sql: string, params: Params, mode: Mode, opts?: QueryOptions): Promise<any> {
     const replica = this.readTarget(sql);
     if (!replica) {
@@ -398,8 +381,8 @@ class Database {
     }
   }
 
-  // Any write clears the result cache. It's blunt but always correct; finer
-  // invalidation is available via the cacheClear export with a table substring.
+  // Any write clears the whole cache. Blunt, but always correct - cacheClear
+  // does finer, table-scoped invalidation when you want it.
   private invalidate(): void {
     if (this.cache.enabled) this.cache.clear();
   }
@@ -460,18 +443,17 @@ class Database {
   }
 
   // --- CRUD helpers --------------------------------------------------------
-  // Build a parameterised statement (identifiers escaped, values bound) and run
-  // it through the normal query path. For anything past equality/IN, use raw SQL.
+  // Build a safe statement (identifiers escaped, values bound) via ./crud and run
+  // it through the normal path. Past equality/IN, use raw SQL.
 
   insertInto(table: string, data: Record<string, any> | Record<string, any>[], opts?: QueryOptions): Promise<number> {
     const q = buildInsert(table, data);
     return this.insert(q.sql, q.values, opts);
   }
 
-  // Insert one row and return it. On MariaDB 10.5+ this is a single round-trip via
-  // INSERT ... RETURNING; elsewhere it falls back to insert-then-select by id (two
-  // round-trips). Both paths run on the primary, so the row is read-after-write
-  // consistent (never a stale replica) and the read cache isn't consulted.
+  // Insert one row and hand it back. One round-trip on MariaDB 10.5+ (INSERT ...
+  // RETURNING), else insert-then-select by id. Both run on the primary and skip
+  // the read cache, so you always get the row you just wrote.
   async insertAndFetch(table: string, data: Record<string, any>, opts?: QueryOptions): Promise<any> {
     if (this.server.supportsReturning) {
       const q = buildInsertReturning(table, data, opts?.returning);
@@ -509,8 +491,8 @@ class Database {
     return this.single(q.sql, q.values);
   }
 
-  // Batch-aware prepared execution: an array of arrays runs the same statement
-  // once per row inside a transaction; otherwise it's a single execute.
+  // An array of arrays runs the statement once per row in a transaction (batch);
+  // anything else is a single execute.
   async prepare(sql: string, params?: Params, opts?: QueryOptions): Promise<any> {
     if (Array.isArray(params) && params.length > 0 && params.every((p) => Array.isArray(p))) {
       return this.batch(sql, params as any[][]);
@@ -554,13 +536,11 @@ class Database {
     });
   }
 
-  // Runs work() inside a single transaction on one pooled connection, retrying
-  // the whole unit when InnoDB reports a deadlock or lock-wait timeout (up to
-  // vsql_tx_retries extra attempts). The transaction is rolled back before each
-  // retry, so replaying is safe for the database; note a callback-form
-  // transaction with side effects *outside* the DB will see those repeated.
-  // The loop itself lives in ./retry; this wires it to the pool, the retry
-  // policy, cache invalidation, and backoff/logging.
+  // Run work() in one transaction on one connection, replaying the whole unit on
+  // a deadlock / lock-wait timeout (up to vsql_tx_retries times). It rolls back
+  // before each retry, so replaying is safe for the DB - but a callback with side
+  // effects *outside* the DB will see them repeated. The loop lives in ./retry;
+  // this wires it to the pool, cache invalidation, and logging.
   private async runAtomic<T>(work: (conn: PoolConnection) => Promise<T>): Promise<T> {
     if (!this.pool) throw new Error('vSQL: pool is not initialized');
     const pool = this.pool;
@@ -614,18 +594,17 @@ class Database {
   }
 }
 
-// Fire a FiveM event without ever letting a listener's error bubble back into
-// our connection lifecycle.
+// Fire a FiveM event; a listener throwing must never break the connection lifecycle.
 function safeEmit(event: string, payload?: any): void {
   try {
     emit(event, payload);
   } catch {
-    /* ignore - an event listener should never break the pool */
+    /* a listener should never break the pool */
   }
 }
 
-// A short, readable label for the status box, e.g. "MariaDB 10.11". Falls back
-// to the raw VERSION() string when we couldn't parse a major/minor.
+// Short label for the status box, e.g. "MariaDB 10.11"; falls back to the raw
+// VERSION() string when we couldn't parse a major/minor.
 function prettyServer(server: ServerInfo): string {
   const name = server.type === 'mariadb' ? 'MariaDB' : server.type === 'mysql' ? 'MySQL' : 'database';
   if (server.major > 0) return `${name} ${server.major}.${server.minor}`;
