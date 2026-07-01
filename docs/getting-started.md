@@ -1,13 +1,13 @@
 # Getting started
 
-The fast path to a working install. For the full walkthrough - prerequisites,
-prebuilt vs source, troubleshooting - see [Installation](/installation); for
-every setting, see [Configuration](/configuration).
+The short path to a working install. If you want the full walkthrough -
+prerequisites, prebuilt vs source, troubleshooting - head to
+[Installation](/installation); for every knob, see [Configuration](/configuration).
 
 ## 1. Add the resource
 
 Drop a [release zip](https://github.com/valerisn/vSQL/releases) into `resources/`
-as `vSQL`, or build from source:
+as `vSQL`, or build it from source:
 
 ```bash
 cd resources
@@ -16,22 +16,22 @@ cd vSQL && npm install && npm run build
 ```
 
 ::: tip
-`dist/` is generated, not committed. Build once after cloning, or use a prebuilt
-release zip that already includes it.
+`dist/` is generated, not committed. Build it once after cloning - or grab a
+prebuilt release zip that already has it.
 :::
 
-## 2. Configure & start
+## 2. Configure and start
 
 ```cfg
 set vsql_connection_string "mysql://root:password@localhost:3306/fivem"
 ensure vSQL
 ```
 
-Put `ensure vSQL` **before** any resource that queries the database.
+Keep `ensure vSQL` **above** anything that queries the database.
 
-## 3. First query
+## 3. Your first query
 
-From **JavaScript**, call the exports directly - Promise or callback:
+From **JavaScript**, call the exports directly - Promise or callback, your choice:
 
 ```js
 // Promise
@@ -55,12 +55,14 @@ local row = MySQL.single.await('SELECT * FROM players WHERE id = ?', { 1 })
 print(row and row.name)
 ```
 
-## Where to next
+That's it - you're querying. From here, pick whatever's next.
+
+## Where to go from here
 
 <div class="vp-doc">
 
-- **[Recipes](/recipes)** - copy-paste solutions for inserts, transactions,
-  pagination, upserts, and more.
+- **[Recipes](/recipes)** - ready-made answers for inserts, transactions,
+  pagination, upserts, and the rest of the everyday stuff.
 - **[Architecture](/architecture)** - how a query flows through vSQL and what
   each module owns.
 - **[Configuration](/configuration)** - the full convar reference and per-call
@@ -72,7 +74,7 @@ print(row and row.name)
 
 ## Console commands
 
-vSQL registers a single `vsql` command with subcommands:
+vSQL registers one `vsql` command with a handful of subcommands:
 
 ```
 vsql              # profiler stats (queries, latency percentiles, busiest resources)
