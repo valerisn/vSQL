@@ -75,6 +75,10 @@ test('buildSelect supports columns, order, limit and offset', () => {
   assert.deepEqual(q.values, ['police', 20, 40]);
 });
 
+test('buildSelect rejects an offset without a limit (invalid SQL)', () => {
+  assert.throws(() => buildSelect('players', { job: 'police' }, { offset: 40 }), /offset requires a limit/);
+});
+
 test('buildSelect with no where omits the WHERE clause', () => {
   const q = buildSelect('players');
   assert.equal(q.sql, 'SELECT * FROM `players`');

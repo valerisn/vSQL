@@ -121,6 +121,11 @@ export function buildSelect(table: string, where?: Where, opts: FindOptions = {}
     const dir = opts.order === 'DESC' ? 'DESC' : 'ASC';
     sql += ` ORDER BY ${escapeId(opts.orderBy)} ${dir}`;
   }
+  // MySQL/MariaDB reject OFFSET without a LIMIT, so catch it with a clear message
+  // instead of letting a raw syntax error surface.
+  if (opts.offset != null && opts.limit == null) {
+    throw new Error('vSQL: offset requires a limit');
+  }
   if (opts.limit != null) {
     sql += ' LIMIT ?';
     values.push(opts.limit);
