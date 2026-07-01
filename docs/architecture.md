@@ -1,15 +1,14 @@
 # Architecture
 
-How a query travels through vSQL, and what each module owns. Useful if you're
-contributing, debugging, or just curious what happens between your `await` and
-the database.
+What happens between your `await` and the database, and which module owns each
+step. Worth a read if you're contributing, chasing a bug, or just curious.
 
-## At a glance
+## The short version
 
-A call enters through an **export**, waits for the pool to be **ready**, is
+A call comes in through an **export**, waits for the pool to be **ready**, gets
 classified as a **read or write**, has its parameters **bound**, runs on a pooled
-**mysql2** connection, is **recorded** by the profiler, and (for writes)
-**invalidates** the cache before the shaped result returns to the caller.
+**mysql2** connection, is **recorded** by the profiler, and - for writes -
+**invalidates** the cache before the shaped result heads back to the caller.
 
 ## Query lifecycle
 
@@ -66,9 +65,10 @@ flowchart TD
 9. **Shape & return** - the result is shaped to the method's contract (`single` →
    row, `scalar` → value, `insert` → id, `update` → affected rows) and returned.
 
-If a fatal connection error surfaces at execution, `handleConnectionLoss()` drops
-the dead pool, emits `vSQL:connectionLost`, and reconnects with backoff;
-in-flight callers wait on the gate and resume on `vSQL:reconnected`.
+If a fatal connection error shows up mid-execution, `handleConnectionLoss()`
+drops the dead pool, emits `vSQL:connectionLost`, and reconnects with backoff.
+Callers that were in flight wait on the gate and pick back up on
+`vSQL:reconnected`.
 
 ## Modules
 
@@ -97,19 +97,19 @@ in-flight callers wait on the gate and resume on `vSQL:reconnected`.
 | `version.ts` | Best-effort GitHub release check on startup. |
 | `banner.ts` / `logger.ts` | Console UI - startup banner, status box, tagged/coloured logging. |
 
-## Design choices
+## Why it's built this way
 
 - **Bind, never interpolate.** Every value goes through `params.ts` as a bound
   `?`, so queries are injection-safe by construction. The binding plan caches a
   query's *structure*, never its values.
-- **Queue, don't fail, during startup/reconnect.** Calls made before the pool is
-  up wait on `whenReady()` instead of throwing.
-- **Blunt but correct cache invalidation.** Any write clears the whole result
+- **Queue during startup/reconnect, don't fail.** Calls made before the pool is
+  up wait on `whenReady()` rather than throwing.
+- **Blunt cache invalidation, on purpose.** Any write clears the whole result
   cache; targeted clears are opt-in via `cacheClear(pattern)`. A stale read is a
-  correctness bug; a cache miss is just a round-trip.
-- **Replay deadlocks, not bugs.** Transactions and batches retry only on InnoDB
-  deadlock / lock-wait timeout, rolling back whole between attempts.
-- **Pure core, testable.** The hot-path logic (`params`, `util`, `cache`,
+  correctness bug - a cache miss is just a round-trip. That trade is never close.
+- **Replay deadlocks, not bugs.** Transactions and batches retry only on an
+  InnoDB deadlock / lock-wait timeout, rolling back whole between attempts.
+- **Pure core, so it's testable.** The hot-path logic (`params`, `util`, `cache`,
   `profiler`, `shape`, `retry`, `gate`, `typecast`) has no FiveM or DB
   dependencies, so it runs under `node --test`. The full suite is ~90 tests.
 
