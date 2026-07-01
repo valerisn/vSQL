@@ -1,10 +1,7 @@
-// Lightweight, safe SQL builders for the boring CRUD cases, so callers don't
-// hand-write `INSERT INTO ... VALUES (?, ?)` for simple inserts/updates. The
-// output is always a parameterised statement: *values* become bound `?`
-// placeholders (the driver binds them, exactly as for raw queries), and
-// *identifiers* (table / column names) are backtick-escaped here - never spliced
-// in raw. This keeps the helpers injection-safe even if a column name is
-// attacker-controlled. For anything beyond equality/IN conditions, use raw query.
+// Safe SQL builders for the boring CRUD cases, so nobody hand-writes
+// `INSERT INTO ... VALUES (?, ?)`. Values become bound `?` placeholders and
+// identifiers get backtick-escaped here, so the output stays injection-safe even
+// if a column name is attacker-controlled. Past equality/IN, drop to raw query.
 
 export interface BuiltQuery {
   sql: string;
@@ -25,10 +22,9 @@ export interface FindOptions {
   offset?: number;
 }
 
-// MySQL identifier escaping: wrap in backticks and double any internal backtick.
-// Dotted names (schema.table) are escaped segment-by-segment. This is the canonical
-// safe form - a malicious name like `x`; DROP TABLE y; --` collapses to a single
-// harmless quoted identifier.
+// Backtick-quote an identifier, doubling any internal backtick; dotted names
+// (schema.table) are quoted segment by segment. A hostile name like
+// `x`; DROP TABLE y; --` just collapses into one harmless quoted string.
 export function escapeId(name: string): string {
   if (typeof name !== 'string' || name.length === 0) {
     throw new Error('vSQL: identifier must be a non-empty string');
@@ -52,7 +48,7 @@ function buildWhere(where: Where, values: any[]): string {
       const v = where[k];
       if (v === null || v === undefined) return `${escapeId(k)} IS NULL`;
       if (Array.isArray(v)) {
-        // Bind the array and let bindParams expand `IN ?` -> `IN (?, ?, ...)`.
+        // Let bindParams expand `IN ?` into `IN (?, ?, ...)`.
         values.push(v);
         return `${escapeId(k)} IN ?`;
       }
@@ -69,16 +65,15 @@ export function buildInsert(table: string, data: Record<string, any> | Record<st
   if (cols.length === 0) throw new Error('vSQL: insert needs at least one column');
   const colSql = cols.map(escapeId).join(', ');
   const values: any[] = [];
-  // Columns are taken from the first row; later rows are read in the same order
-  // (a missing key binds NULL, like the rest of vSQL).
+  // Column list comes from the first row; later rows follow it (a missing key
+  // binds NULL, same as everywhere else in vSQL).
   const tuples = rows.map(
     (row) => '(' + cols.map((c) => (values.push(row[c]), '?')).join(', ') + ')'
   );
   return { sql: `INSERT INTO ${escapeId(table)} (${colSql}) VALUES ${tuples.join(', ')}`, values };
 }
 
-// INSERT ... RETURNING <cols|*>, for MariaDB 10.5+ - the inserted row comes back
-// in the same round-trip as the insert.
+// INSERT ... RETURNING for MariaDB 10.5+: the new row comes back with the insert.
 export function buildInsertReturning(
   table: string,
   data: Record<string, any> | Record<string, any>[],
@@ -89,8 +84,7 @@ export function buildInsertReturning(
   return { sql: `${q.sql} RETURNING ${cols}`, values: q.values };
 }
 
-// The fallback read for servers without RETURNING: fetch the just-inserted row by
-// its id. The value (the insertId) is bound by the caller.
+// Fallback for servers without RETURNING: read the just-inserted row back by id.
 export function buildSelectById(table: string, idColumn = 'id', returning?: string[]): string {
   const cols = returning && returning.length ? returning.map(escapeId).join(', ') : '*';
   return `SELECT ${cols} FROM ${escapeId(table)} WHERE ${escapeId(idColumn)} = ?`;

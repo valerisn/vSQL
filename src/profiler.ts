@@ -54,30 +54,25 @@ export class Profiler {
   count = 0;
   errors = 0;
   cacheHits = 0;
-  // Live in-flight gauge: when peakInFlight climbs well past the pool size, queries
-  // are queueing for a connection - the real latency cliff under load.
+  // When peakInFlight runs well past the pool size, queries are queueing for a
+  // connection - that's the latency cliff under load.
   inFlight = 0;
   peakInFlight = 0;
-  // Slow-query threshold in ms. Configured from the convar at startup rather
-  // than read from the global config on every record(), so the profiler has no
-  // hidden dependency and can be exercised in isolation.
+  // Set from the convar at startup, not read from global config per record(), so
+  // the profiler stays a self-contained leaf we can test in isolation.
   slowMs = 150;
   private totalMs = 0;
-  // Latency samples kept in a fixed-size ring buffer. Writing into a slot we
-  // overwrite (instead of push + shift) keeps record() O(1) on the hot path
-  // once the window fills, rather than O(n) from shifting a growing array.
+  // Latency samples in a ring buffer - overwrite in place instead of push+shift,
+  // so record() stays O(1) once the window fills.
   private readonly maxSamples = 2000;
   private samples: number[] = [];
   private sampleHead = 0;
   private slow: SlowEntry[] = [];
-  // Per-shape aggregates, à la pg_stat_statements: which *kinds* of query cost
-  // the most in aggregate, not just which single call was slow. Bounded so a
-  // flood of distinct shapes can't grow memory without limit.
+  // pg_stat_statements-style: which *kinds* of query cost the most overall, not
+  // just which single call was slow. Bounded so a flood of shapes can't leak.
   private readonly maxShapes = 1000;
   private shapes = new Map<string, ShapeAgg>();
-  // Per calling-resource aggregates, so a monitor can see which resource is
-  // actually driving the database. Bounded like the shape table; resources are
-  // few in practice, so eviction is a safety net rather than a hot path.
+  // Same idea per calling resource - who's actually driving the database.
   private readonly maxResources = 256;
   private resources = new Map<string, ResourceAgg>();
 
@@ -119,8 +114,8 @@ export class Profiler {
     this.shapes.set(shape, { count: 1, totalMs: ms, maxMs: ms });
   }
 
-  // Drop the shape with the least total time so the heavy hitters survive. Only
-  // runs when the shape table is full and a brand-new shape appears.
+  // Evict the cheapest shape so the heavy hitters survive. Only when the table's
+  // full and a new shape shows up.
   private evictLightestShape(): void {
     let lightestKey: string | undefined;
     let lightest = Infinity;
@@ -133,8 +128,8 @@ export class Profiler {
     if (lightestKey !== undefined) this.shapes.delete(lightestKey);
   }
 
-  // The heaviest query shapes by total time consumed - the ones actually worth
-  // optimizing, even when each individual call looks fast.
+  // Heaviest shapes by total time - the ones worth optimizing, even when each
+  // individual call looks fast.
   top(limit = 10): ShapeStat[] {
     return [...this.shapes.entries()]
       .map(([shape, a]) => ({ shape, count: a.count, totalMs: a.totalMs, avgMs: a.totalMs / a.count, maxMs: a.maxMs }))
@@ -142,7 +137,7 @@ export class Profiler {
       .slice(0, limit);
   }
 
-  // Fetch (or lazily create, with bounded eviction) the aggregate for a resource.
+  // Get or lazily create the aggregate for a resource, evicting if full.
   private resourceAgg(resource: string): ResourceAgg {
     let agg = this.resources.get(resource);
     if (!agg) {
@@ -165,7 +160,7 @@ export class Profiler {
     if (lightestKey !== undefined) this.resources.delete(lightestKey);
   }
 
-  // Activity broken down by calling resource, heaviest (by total time) first.
+  // Activity per resource, heaviest first.
   byResource(limit = 10): ResourceStat[] {
     return [...this.resources.entries()]
       .map(([resource, a]) => ({
@@ -179,7 +174,7 @@ export class Profiler {
       .slice(0, limit);
   }
 
-  // Bracket a query (including its wait for a pool connection) with enter()/leave().
+  // Bracket a query - including its wait for a connection - with enter()/leave().
   enter(): void {
     this.inFlight++;
     if (this.inFlight > this.peakInFlight) this.peakInFlight = this.inFlight;
@@ -197,7 +192,7 @@ export class Profiler {
   recordCacheHit(resource?: string): void {
     this.cacheHits++;
     this.count++;
-    // A cache hit is a query the resource made; it just cost ~no server time.
+    // Still a query the resource made, it just cost ~no server time.
     if (resource) this.resourceAgg(resource).count++;
   }
 
@@ -234,22 +229,21 @@ export class Profiler {
     this.slow = [];
     this.shapes.clear();
     this.resources.clear();
-    // Keep the live in-flight count (queries are still running); just reset the
-    // high-water mark to the current level.
+    // Queries are still running, so keep the live count; just drop the high-water
+    // mark back to it.
     this.peakInFlight = this.inFlight;
   }
 }
 
-// Collapse whitespace and cap length so a stored slow-query sample stays a short
-// one-liner in the profiler output. Kept local so the profiler has no imports.
+// Flatten to a short one-liner for the slow-query log. Local so the profiler
+// keeps zero imports (it's a leaf module).
 function summarize(sql: string, max = 200): string {
   const flat = sql.replace(/\s+/g, ' ').trim();
   return flat.length > max ? `${flat.slice(0, max)}…` : flat;
 }
 
-// Reduce a query to its structural shape by erasing the parts that vary between
-// calls - literals, comments, and IN-list lengths - so `WHERE id = 5` and
-// `WHERE id = 9` aggregate together. Exported for tests.
+// Strip the parts that vary between calls - literals, comments, IN-list length -
+// so `WHERE id = 5` and `WHERE id = 9` collapse to one shape. Exported for tests.
 export function normalizeShape(sql: string, max = 300): string {
   const flat = sql
     .replace(/\/\*[\s\S]*?\*\//g, ' ') // block comments

@@ -1,9 +1,8 @@
 export const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
-// Exponential backoff with full jitter - the jitter matters when several
-// resources (or several pool connections) all reconnect at once after the DB
-// blips, so they don't stampede it in lockstep.
+// Exponential backoff, half fixed + half jitter. The jitter stops a bunch of
+// connections that dropped together from all retrying on the same beat.
 export function backoff(attempt: number, base = 500, cap = 30_000): number {
   const exp = Math.min(cap, base * 2 ** (attempt - 1));
   return Math.floor(exp / 2 + Math.random() * (exp / 2));
@@ -14,8 +13,7 @@ export function preview(sql: string, max = 200): string {
   return flat.length > max ? `${flat.slice(0, max)}…` : flat;
 }
 
-// Leading whitespace / parens / comments we skip before reading the first
-// keyword, shared by the two checks below.
+// Skip leading whitespace, parens, and comments before the first keyword.
 const LEAD = String.raw`^\s*(?:\(|\/\*[\s\S]*?\*\/|--.*\n|#.*\n|\s)*`;
 const READ_LEAD = new RegExp(`${LEAD}(?:select|with|show|describe|desc|explain)\\b`, 'i');
 const WITH_LEAD = new RegExp(`${LEAD}with\\b`, 'i');
@@ -23,19 +21,14 @@ const DML_VERB = /\b(?:insert|update|delete|replace)\b/i;
 
 export function isReadQuery(sql: string): boolean {
   if (!READ_LEAD.test(sql)) return false;
-  // A `WITH ...` (CTE) statement only reads when its top-level statement is a
-  // SELECT. CTE bodies are always SELECT, so a standalone INSERT/UPDATE/DELETE/
-  // REPLACE verb means the statement mutates - e.g. `WITH x AS (...) DELETE ...`.
-  // Treating it as a write keeps it out of the result cache and makes it
-  // invalidate like any other write. Erring toward "write" is the safe side:
-  // the worst case is a genuine read needlessly skips the cache.
+  // A CTE reads only if it ends in a SELECT; `WITH x AS (...) DELETE ...` writes.
+  // When in doubt call it a write - worst case a real read skips the cache.
   if (WITH_LEAD.test(sql) && DML_VERB.test(sql)) return false;
   return true;
 }
 
-// mysql2 flags unrecoverable connection failures with `fatal: true`; these
-// codes cover the cases where it can't (or where we want to be explicit). When
-// one of these surfaces the pooled connection is dead and we should reconnect.
+// mysql2 marks most dead connections with `fatal: true`; these codes catch the
+// rest. Any of them means the pooled connection is gone and we should reconnect.
 const FATAL_CONNECTION_CODES = new Set([
   'PROTOCOL_CONNECTION_LOST',
   'PROTOCOL_PACKETS_OUT_OF_ORDER',
@@ -53,9 +46,8 @@ export function isFatalConnectionError(err: any): boolean {
   return typeof err.code === 'string' && FATAL_CONNECTION_CODES.has(err.code);
 }
 
-// Turn a raw driver/socket error into an actionable, plain-language hint so a
-// misconfigured server owner isn't left staring at a bare error code. Returns
-// an empty string when we have nothing useful to add.
+// Turn a bare driver error code into a plain-language hint, so a misconfigured
+// owner isn't left googling ECONNREFUSED. Empty string when we've nothing to add.
 export function connectionHint(err: any): string {
   const code = typeof err?.code === 'string' ? err.code : '';
   switch (code) {
@@ -77,16 +69,13 @@ export function connectionHint(err: any): string {
   }
 }
 
-// InnoDB raises these when concurrent transactions contend for the same rows.
-// They aren't bugs in the query - the transaction simply needs to be replayed,
-// which is safe because it was already rolled back whole.
+// InnoDB throws these when transactions fight over the same rows. Not a bug in
+// the query - just replay it, which is safe since it already rolled back whole.
 const RETRYABLE_CODES = new Set(['ER_LOCK_DEADLOCK', 'ER_LOCK_WAIT_TIMEOUT']);
 
-// Wrap a single statement so it is capped server-side for this one call, used
-// by the per-call { timeout } option. MariaDB's `SET STATEMENT ... FOR` caps any
-// statement in one round trip; MySQL only supports the MAX_EXECUTION_TIME
-// optimizer hint, and only inside a leading SELECT (other statements are left
-// unwrapped - use the global vsql_query_timeout there).
+// Cap one statement server-side, for the per-call { timeout } option. MariaDB
+// can cap anything via SET STATEMENT; MySQL only has the MAX_EXECUTION_TIME hint
+// and only on a leading SELECT - other statements fall through unwrapped.
 export function withStatementTimeout(
   sql: string,
   ms: number,
@@ -108,30 +97,22 @@ export function isRetryableError(err: any): boolean {
   return err.errno === 1213 || err.errno === 1205; // deadlock / lock wait timeout
 }
 
-// Locking reads (`SELECT ... FOR UPDATE`, `LOCK IN SHARE MODE`, MySQL 8's
-// `FOR SHARE`) acquire row locks and must hit the server every time - serving
-// them from the result cache would silently drop the lock and break the
-// consistency they were asked for. They're still reads, so isReadQuery passes;
-// this guard keeps them out of the cache specifically.
+// Locking reads (FOR UPDATE / FOR SHARE / LOCK IN SHARE MODE) take row locks, so
+// they have to reach the server - caching one would quietly drop the lock.
 export function isLockingRead(sql: string): boolean {
   return /\bfor\s+(?:update|share)\b|\block\s+in\s+share\s+mode\b/i.test(sql);
 }
 
-// Whether a query's result may be served from (and stored in) the result cache.
-// It must be a plain read, with caching enabled, not opted out for this call
-// ({ cache: false }), and not a locking read - locking reads have to reach the
-// server to actually take their row locks, so caching them would silently drop
-// the consistency the caller asked for. Erring toward "not cacheable" is always
-// the safe side: the cost is a server round-trip, never stale data.
+// Can this result live in the cache? Only a plain, non-locking read with caching
+// on and not opted out. When unsure, don't cache - the cost is a round-trip, not
+// a stale row.
 export function isCacheable(sql: string, cacheEnabled: boolean, optedOut: boolean): boolean {
   return isCacheableRead(sql, cacheEnabled, optedOut, isReadQuery(sql));
 }
 
-// Same decision, but with the read/write classification already known - so the
-// hot read path (which has to classify anyway, to route reads vs writes) doesn't
-// re-run isReadQuery a second time on every cached lookup. The cheap checks are
-// ordered first so a disabled cache or an opt-out short-circuits before the
-// isLockingRead regex.
+// Same call, but the read path already classified the query for routing, so pass
+// that in rather than re-running isReadQuery. Cheap checks first, so a disabled
+// cache short-circuits before the isLockingRead regex.
 export function isCacheableRead(sql: string, cacheEnabled: boolean, optedOut: boolean, isRead: boolean): boolean {
   return cacheEnabled && !optedOut && isRead && !isLockingRead(sql);
 }
