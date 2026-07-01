@@ -5,21 +5,15 @@ export interface BoundQuery {
   values: any[];
 }
 
-// We parse placeholders ourselves rather than leaning on mysql2's named-param
-// support so that `?`, `@name` and `:name` can all be used (oxmysql accepts a
-// mix), and so we can expand arrays into IN (...) lists. Everything still ends
-// up as positional `?` with values bound by the driver - never string
-// interpolation - so this stays injection-safe.
+// We parse placeholders ourselves (rather than lean on mysql2) so `?`, `@name`,
+// and `:name` all work and arrays expand into IN (...) lists. Everything still
+// lands as positional `?` bound by the driver, never interpolated.
 //
-// Hot-path shape: a SQL string's *structure* (how many `?` it has, whether it
-// uses named placeholders) never changes between calls, so we analyse it once
-// and memoise a Plan. A reused query - the norm in FiveM, where call sites pass
-// the same literal every frame - then skips the parse entirely. For a plain
-// positional query with no array values the SQL is handed to the driver
-// untouched (only the values are shaped); anything needing a rewrite (IN-list
-// expansion, named -> ?) falls back to the full single-pass parser below. The
-// Plan records structure only, never values, so binding stays positional and
-// injection-safe.
+// The trick: a SQL string's *structure* never changes between calls, so we
+// analyse it once and cache a Plan. A reused query - the FiveM norm, same literal
+// every frame - then skips the parse: a plain positional query goes to the driver
+// untouched, and only a rewrite (IN-list, named -> ?) hits the full parser below.
+// The Plan records structure only, never values.
 export function bindParams(sql: string, params: Params): BoundQuery {
   if (params === undefined || params === null) {
     return { sql, values: [] };
@@ -64,10 +58,9 @@ function refsHaveArray(refs: NamedRef[], obj: Record<string, any>): boolean {
   return false;
 }
 
-// Shape a positional param array to the placeholder count: zero-copy when the
-// arity matches and nothing is undefined, otherwise pad missing trailing params
-// with NULL and coerce any undefined (mysql2 rejects undefined) - identical
-// output to the full parser for a plain positional query.
+// Fit a positional array to the placeholder count: zero-copy when the arity
+// matches and nothing's undefined, else pad missing trailing params with NULL and
+// coerce undefined (mysql2 rejects it).
 function positionalValues(sql: string, params: any[], count: number): BoundQuery {
   if (params.length === count) {
     let i = 0;
@@ -125,9 +118,8 @@ function fullBind(sql: string, params: Params): BoundQuery {
       continue;
     }
 
-    // `--` only opens a comment when followed by whitespace or end-of-input;
-    // `5--1` is `5 - -1`, not a comment. `#` always runs to end-of-line. Getting
-    // this right matters so a `?` after a no-space `--` is still bound.
+    // `--` opens a comment only before whitespace or end-of-input; `5--1` is
+    // `5 - -1`, not a comment. Get this wrong and a `?` after `--` goes unbound.
     const dashComment =
       ch === '-' && sql[i + 1] === '-' && (i + 2 >= len || /\s/.test(sql[i + 2]));
     if (dashComment || ch === '#') {
@@ -156,9 +148,8 @@ function fullBind(sql: string, params: Params): BoundQuery {
       if (!isArray) {
         throw new Error('vSQL: positional "?" used but parameters were passed as a named object');
       }
-      // Reading past the end yields `undefined`, which expand() binds as NULL -
-      // so a statement with more placeholders than values pads the extras with
-      // NULL (matching oxmysql) instead of erroring on the count mismatch.
+      // Past the end is `undefined`, which expand() binds as NULL - so extra
+      // placeholders pad with NULL (like oxmysql) instead of erroring.
       out += expand((params as any[])[positional++], values);
       i++;
       continue;
@@ -202,10 +193,9 @@ function fullBind(sql: string, params: Params): BoundQuery {
 }
 
 function expand(value: any, values: any[]): string {
-  // Arrays become (?, ?, ...) so `WHERE id IN ?` works. Buffers are scalar
-  // values, not lists, so they fall through to a single binding. `undefined` is
-  // never a valid bind value (mysql2 rejects it), so it is coerced to NULL at
-  // every binding point - this is what turns a missing trailing param into NULL.
+  // Arrays become (?, ?, ...) so `WHERE id IN ?` works; a Buffer is a scalar, not
+  // a list, so it binds once. undefined -> NULL everywhere (mysql2 rejects it),
+  // which is also how a missing trailing param becomes NULL.
   if (Array.isArray(value)) {
     if (value.length === 0) return '(NULL)';
     return `(${value.map((v) => (values.push(v === undefined ? null : v), '?')).join(', ')})`;
@@ -217,12 +207,10 @@ function expand(value: any, values: any[]): string {
 // --- binding-plan memoisation ---------------------------------------------
 
 // What a SQL string needs at bind time, derived once from its structure.
-//   none       - no placeholders at all; values are always empty.
-//   positional - only `?` placeholders (count known); the SQL is reused as-is.
-//   named      - only named placeholders; we pre-compile the rewritten SQL
-//                (named -> ?) and the ordered names once, then just read values.
-//   other      - mixes `?` and named (or is otherwise rewrite-only); handed to
-//                the full parser, which owns the exact array-vs-named errors.
+//   none       - no placeholders; values always empty.
+//   positional - only `?` (count known); SQL reused as-is.
+//   named       - only named; pre-compiled to `?` with the names in order.
+//   other       - a mix of `?` and named; handed to the full parser.
 interface NamedRef {
   name: string; // bare name, for the params-object lookup
   raw: string; // original token incl. `@`/`:`, for error messages
@@ -252,11 +240,9 @@ function getPlan(sql: string): Plan {
   return plan;
 }
 
-// Classify a SQL string by a single quote/comment-aware scan, mirroring the full
-// parser's literal-skipping exactly but building no output. Counts `?` and flags
-// named placeholders. A query that uses *only* named placeholders is compiled to
-// a reusable template; one that mixes `?` and named is 'other' (the full parser
-// owns the array-vs-named error semantics).
+// One quote/comment-aware scan that counts `?` and flags named placeholders,
+// skipping literals exactly like the full parser but producing no output. Purely
+// named -> a reusable template; a mix of `?` and named -> 'other' (full parser).
 function analyze(sql: string): Plan {
   let count = 0;
   let named = false;
@@ -333,9 +319,8 @@ function analyze(sql: string): Plan {
   return count === 0 ? { kind: 'none' } : { kind: 'positional', count };
 }
 
-// Build the reusable template for a purely-named query: each `@name`/`:name`
-// becomes a positional `?` (still driver-bound, never interpolated) and the
-// names are recorded in order. Done once per SQL, then cached.
+// Compile a purely-named query into a reusable template: each `@name`/`:name`
+// becomes a `?` and the names are recorded in order. Once per SQL, then cached.
 function compileNamed(sql: string): Plan {
   const refs: NamedRef[] = [];
   let out = '';
