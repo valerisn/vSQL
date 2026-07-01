@@ -1,8 +1,7 @@
-// A health-aware, round-robin set of read replicas. Reads are spread across the
-// healthy replicas; when one errors with a connection failure it is taken out of
-// rotation for a cooldown and the caller falls back to the primary. Pure and
-// generic over the pool type (and clock-injectable), so the selection and health
-// logic is testable without real pools.
+// A round-robin set of read replicas that tracks health: a replica that fails a
+// connection drops out for a cooldown and the caller falls back to the primary.
+// Generic over the pool type and clock-injectable, so selection and health are
+// testable without real pools.
 
 interface Entry<T> {
   pool: T;

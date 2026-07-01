@@ -1,8 +1,7 @@
-// Schema introspection helpers - thin queries against information_schema, scoped
-// to the connected database via DATABASE(). Table and column names are passed as
-// bound *values* here (compared as strings, never spliced in as identifiers), so
-// these stay injection-safe like any other parameterised query. The SQL and the
-// row-shaping live here so they can be exercised without a database.
+// Schema introspection - information_schema queries scoped to the current
+// database via DATABASE(). Table/column names go in as bound *values* (compared
+// as strings, never as identifiers), so it's injection-safe. SQL and row-shaping
+// live here so they can be tested without a database.
 
 export interface ColumnInfo {
   /** Column name. */

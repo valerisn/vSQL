@@ -1,15 +1,10 @@
-// The exact compat export surface vSQL claims, mirroring oxmysql 2.14.1.
+// The exact compat surface vSQL claims, mirroring oxmysql 2.14.1: every method as
+// `name`, `name_async`, and the deprecated `nameSync`, plus a subset on the
+// ghmattimysql and mysql-async namespaces. Plain data in a leaf module so a test
+// can pin it and it can't silently drift from the reference.
 //
-// oxmysql exposes every method on its own namespace as `name`, `name_async`
-// (promise-returning) and `nameSync` (a deprecated alias of `_async`), and
-// additionally answers a subset on the `ghmattimysql` and `mysql-async`
-// namespaces. We reproduce that surface so a resource written against any of
-// them is a true drop-in. Kept as plain data in a leaf module so the surface is
-// unit-testable and can't silently drift from the reference.
-//
-// Intentional difference: oxmysql also exports the experimental `startTransaction`
-// (manual commit/rollback handle); vSQL has no equivalent contract, so it is
-// deliberately omitted. See COMPATIBILITY.md.
+// One deliberate gap: oxmysql's experimental `startTransaction` (a manual
+// commit/rollback handle) has no vSQL equivalent, so it's omitted - see COMPATIBILITY.md.
 
 /** The methods vSQL serves on the `oxmysql` namespace. */
 export const COMPAT_METHODS = [

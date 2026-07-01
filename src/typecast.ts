@@ -1,19 +1,12 @@
 import type { TypeCastField, TypeCastNext } from 'mysql2/promise';
 
-// Optional, opt-in result type-casting compatible with oxmysql / mysql-async,
-// for resources that expect those conventions. Off by default (vsql_typecast);
-// without it vSQL returns mysql2's native JS types.
-//
-// Covers the casts stock mysql2 can express through the typeCast field:
-//   DATETIME / TIMESTAMP / NEWDATE -> epoch milliseconds (number)
+// Opt-in casting for resources that expect oxmysql / mysql-async conventions
+// (vsql_typecast). Off by default, when vSQL returns mysql2's native types.
+//   DATETIME / TIMESTAMP / NEWDATE -> epoch milliseconds
 //   DATE                           -> epoch milliseconds at local midnight
-//   TINYINT(1)                     -> boolean
-//   BIT(1)                         -> boolean
-//
-// oxmysql additionally returns binary columns as a byte array, but that relies
-// on a patch to mysql2 that exposes `field.charset`. vSQL deliberately does not
-// patch the driver, so binary columns fall through to mysql2's default (a
-// Buffer) - see COMPATIBILITY.md. Everything else falls through to next().
+//   TINYINT(1) / BIT(1)            -> boolean
+// oxmysql also returns binary columns as a byte array, but that needs a mysql2
+// patch we don't apply, so binary falls through to a Buffer - see COMPATIBILITY.md.
 export function castValue(field: TypeCastField, next: TypeCastNext): any {
   switch (field.type) {
     case 'DATETIME':

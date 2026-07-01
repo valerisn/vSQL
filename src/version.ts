@@ -1,10 +1,9 @@
 import { config } from './config';
 import { logger } from './logger';
 
-// On startup we compare the version declared in fxmanifest.lua against the
-// latest GitHub release, so server owners notice when an update is available
-// without having to check the repo by hand. The check is best-effort: any
-// network/parse problem is logged at debug level and never blocks boot.
+// Compare the fxmanifest.lua version against the latest GitHub release on boot,
+// so owners hear about updates without checking the repo. Best-effort: any
+// network/parse hiccup is logged at debug and never blocks startup.
 
 interface SemVer {
   major: number;

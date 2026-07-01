@@ -1,7 +1,6 @@
-// Startup UI for the FXServer console. Everything here writes raw lines (no
-// [vSQL] tag prefix) so the banner and status box frame cleanly. FiveM console
-// colours are `^` + a digit; we strip those when measuring width so box borders
-// stay aligned regardless of the colours inside a row.
+// Startup UI for the FXServer console - raw lines (no [vSQL] tag) so the banner
+// and status box frame cleanly. FiveM colours are `^` + a digit; we strip them
+// when measuring width so the box borders line up whatever colours are inside.
 
 const C = {
   reset: '^7',

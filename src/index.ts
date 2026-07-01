@@ -10,8 +10,8 @@ import { printBanner } from './banner';
 
 const resourceName = GetCurrentResourceName();
 
-// Register everything synchronously at load so other resources can call our
-// exports immediately - calls made before the pool is up queue via whenReady().
+// Register everything at load so other resources can call our exports right away;
+// anything issued before the pool is up queues on whenReady().
 config.load();
 registerExports();
 registerCommands();
@@ -19,8 +19,7 @@ registerCompat();
 
 printBanner(currentVersion() || '?', config.versionRepo);
 logger.debug(`debug logging level ${config.debug}`);
-// At debug >= 1, dump the effective (password-redacted) settings so issues are
-// diagnosable from the console log alone.
+// Dump the effective (redacted) settings, so a debug log is enough to diagnose from.
 for (const lineText of config.summary()) logger.debug(lineText);
 
 // Surface likely misconfigurations once, before the pool tries to connect.

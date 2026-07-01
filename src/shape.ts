@@ -1,7 +1,5 @@
-// Pure result-shaping helpers for the query paths, plus the transaction-entry
-// normaliser. Kept dependency-free so the return-shape contracts each method
-// promises - single -> row|null, scalar -> first column|null, insert ->
-// insertId, update -> affectedRows - can be exercised in isolation.
+// Pure result-shaping for the query paths, plus the transaction-entry normaliser.
+// Dependency-free, so each method's return contract can be tested on its own.
 
 /** single(): the first row of the result set, or null when it is empty. */
 export function asSingle(rows: any): any {
@@ -32,10 +30,9 @@ export type TransactionEntry =
   | [string, any]
   | { query?: string; sql?: string; values?: any; params?: any };
 
-// Reduce any accepted entry shape to a [sql, params] tuple. A bare string has no
-// params; the tuple form is taken as-is; the object form accepts query/sql for
-// the text and values/params for the bindings (so configs written against other
-// resources carry over).
+// Reduce any accepted entry shape to a [sql, params] tuple. The object form takes
+// query/sql for the text and values/params for the bindings, so entries written
+// against other resources carry over.
 export function normalizeEntry(entry: TransactionEntry): [string, any] {
   if (typeof entry === 'string') return [entry, undefined];
   if (Array.isArray(entry)) return [entry[0], entry[1]];
