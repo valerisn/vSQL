@@ -103,11 +103,9 @@ class Config {
     this.replicaCooldownMs = int('vsql_replica_cooldown', 10_000);
   }
 
-  // Read-replica connections. Two ergonomic forms, combinable:
-  //   vsql_read_replicas  - comma-separated full connection strings (URL form)
-  //   vsql_replica_hosts  - comma-separated host[:port], reusing the primary's
-  //                         user/password/database (the common "same creds,
-  //                         different host" replica setup).
+  // Read-replica connections, from either (or both) convar:
+  //   vsql_read_replicas - full connection strings, comma-separated
+  //   vsql_replica_hosts - host[:port], reusing the primary's creds/database
   private parseReplicas(): BaseConnection[] {
     const out: BaseConnection[] = [];
     const list = str('vsql_read_replicas', '');
@@ -135,8 +133,7 @@ class Config {
     return `${this.base.host}:${this.base.port}/${this.base.database || '(none)'}`;
   }
 
-  // A redacted, human-readable view of the effective settings, for the startup
-  // debug log and the `vsql debug` command. Deliberately omits the password.
+  // Human-readable view of the effective settings for `vsql debug`. No password.
   summary(): string[] {
     return [
       `target      ${this.target()}`,
@@ -153,9 +150,8 @@ class Config {
     ];
   }
 
-  // Plain-language warnings about a configuration that will load but is likely
-  // a mistake. Surfaced once at startup so common misconfigurations are caught
-  // before they turn into confusing query errors later.
+  // Warnings for a config that loads but is probably a mistake, shown once at
+  // startup before it turns into a confusing query error.
   issues(): string[] {
     const out: string[] = [];
     if (!this.base.database) {
@@ -185,11 +181,9 @@ class Config {
       keepAliveInitialDelay: 10_000,
       multipleStatements: false,
       namedPlaceholders: false,
-      // Opt-in oxmysql-compatible casting at the pool level; per-call overrides
-      // (QueryOptions.typeCast) are applied per query in Database.exec.
+      // Pool-level casting; per-call overrides are applied in Database.exec.
       ...(this.typeCast ? { typeCast: castValue } : {}),
-      // mysql2 keeps an LRU of prepared statements per connection; this is the
-      // "prepared-statement caching" knob for the execute() path.
+      // mysql2's per-connection prepared-statement LRU - the caching for execute().
       maxPreparedStatements: 1000,
       decimalNumbers: true,
       supportBigNumbers: true,
@@ -197,20 +191,19 @@ class Config {
     };
   }
 
-  // Per-connection session setup. Run for every new physical pool connection so
-  // charset/timeouts are consistent regardless of the server's global defaults.
+  // Session setup run on every new pool connection, so charset/timeouts don't
+  // depend on the server's global defaults.
   sessionStatements(server: ServerInfo): string[] {
     const stmts = [`SET NAMES ${this.charset} COLLATE ${this.collation}`];
     if (this.waitTimeout > 0) {
       stmts.push(`SET SESSION wait_timeout = ${this.waitTimeout}, interactive_timeout = ${this.waitTimeout}`);
     }
     if (this.queryTimeout > 0 && server.type !== 'unknown') {
-      // Cap statement runtime server-side so a runaway query can't hold a
-      // connection (and hitch dependent resources) indefinitely. MariaDB's
-      // max_statement_time is in seconds and applies to all statements; MySQL's
-      // max_execution_time is in milliseconds and only caps read-only SELECTs.
-      // Skipped until the server type is known (the very first pool connection
-      // tunes before detection); that connection is re-tuned in Database.start.
+      // Cap statement runtime so a runaway query can't hold a connection forever.
+      // MariaDB's max_statement_time is seconds and caps everything; MySQL's
+      // max_execution_time is ms and caps only read-only SELECTs. Skipped until
+      // the server is known - the first connection tunes before detection, then
+      // Database.start re-tunes it.
       stmts.push(
         server.type === 'mariadb'
           ? `SET SESSION max_statement_time = ${this.queryTimeout / 1000}`
