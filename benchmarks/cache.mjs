@@ -69,6 +69,7 @@ const pool = mysql.createPool({ uri: process.env.BENCH_DB, connectionLimit: 1, n
 const tbl = `vsql_cache_bench_${Date.now()}`;
 
 try {
+  await pool.query(`DROP TABLE IF EXISTS ${tbl}`);
   await pool.query(`CREATE TABLE ${tbl} (id INT PRIMARY KEY, name VARCHAR(64), money INT) ENGINE=InnoDB`);
   await pool.execute(`INSERT INTO ${tbl} (id, name, money) VALUES (?, ?, ?)`, [42, 'bob', 1000]);
 
