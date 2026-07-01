@@ -34,9 +34,8 @@ class Migrator {
       : path.join(base, config.migrationsDir);
   }
 
-  // Migrations get a dedicated connection with multipleStatements enabled so a
-  // single .sql file can hold several statements - the pool deliberately keeps
-  // that off for normal queries.
+  // A dedicated connection with multipleStatements on, so one .sql file can hold
+  // several statements. The normal pool keeps that off on purpose.
   private connect(): Promise<Connection> {
     return mysql.createConnection({ ...config.base, multipleStatements: true });
   }
@@ -88,8 +87,8 @@ class Migrator {
     return map;
   }
 
-  // Advisory lock so two servers booting against the same DB don't both try to
-  // apply the same migration. GET_LOCK is available on both MySQL and MariaDB.
+  // Advisory lock so two servers booting on the same DB don't both apply a
+  // migration. GET_LOCK exists on both MySQL and MariaDB.
   private async withLock<T>(conn: Connection, fn: () => Promise<T>): Promise<T> {
     const [rows] = await conn.query("SELECT GET_LOCK('vsql_migrations', 30) AS ok");
     if ((rows as any[])[0]?.ok !== 1) {

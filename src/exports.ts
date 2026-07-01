@@ -4,9 +4,9 @@ import { invokingResource } from './invoker';
 
 type Callback = (result: any, error?: any) => void;
 
-// Bridges a promise to either Promise-style (JS `await`) or callback-style
-// usage. When a node-style callback is supplied we never return the promise, so
-// errors don't surface as unhandled rejections.
+// Serve a call either way: return the promise for `await`, or drive a callback.
+// With a callback we don't return the promise, so errors can't become unhandled
+// rejections.
 function bridge(promise: Promise<any>, cb?: Callback): Promise<any> | void {
   if (typeof cb === 'function') {
     promise.then((r) => cb(r)).catch((e) => {
@@ -19,9 +19,8 @@ function bridge(promise: Promise<any>, cb?: Callback): Promise<any> | void {
 }
 
 export function registerExports(): void {
-  // (sql, params?, opts?, cb?) - params, opts and cb are each optional. A
-  // function in the params or opts slot is treated as the callback; an object in
-  // the 3rd slot is per-call options ({ timeout, cache }).
+  // (sql, params?, opts?, cb?), all optional. A function in the params or opts
+  // slot is the callback; an object in the 3rd slot is { timeout, cache }.
   const standard = (method: 'query' | 'execute' | 'single' | 'scalar' | 'insert' | 'update' | 'prepare') => {
     return (sql: string, params?: any, optsOrCb?: any, cb?: any) => {
       // Capture the caller before anything async; it's gone after the first await.
@@ -70,8 +69,7 @@ export function registerExports(): void {
     return bridge(db.whenReady().then(() => db.transaction(queries)), cb);
   });
 
-  // Merge the calling resource into a per-call options object (for attribution).
-  // Read synchronously here, before the first await.
+  // Fold the calling resource into the options, read now before the first await.
   const withResource = (userOpts?: any) => {
     const resource = invokingResource();
     if (userOpts && typeof userOpts === 'object') return { ...userOpts, resource };
