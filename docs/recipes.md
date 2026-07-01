@@ -1,13 +1,13 @@
 # Recipes
 
-Copy-paste solutions for the tasks that come up most. Examples use the JS Promise
-API (`exports.vSQL.*`); the Lua `MySQL.*` wrapper mirrors every method (append
-`.await` inside a thread, or pass a callback as the last argument).
+The stuff you'll actually reach for, ready to copy. Examples use the JS Promise
+API (`exports.vSQL.*`); the Lua `MySQL.*` wrapper mirrors every method - append
+`.await` inside a thread, or pass a callback as the last argument.
 
 ::: danger Always parameterise
-Every value goes in as a bound `?` / `@name` parameter. **Never** concatenate
-user input into a query string - that's how SQL injection happens, and vSQL's
-parameters make it unnecessary.
+Every value goes in as a bound `?` / `@name` parameter. **Never** paste user
+input into a query string - that's exactly how SQL injection happens, and vSQL's
+parameters mean you never have to.
 :::
 
 ## Reading
@@ -107,9 +107,9 @@ const live = await exports.vSQL.query('SELECT * FROM players WHERE deleted_at IS
 
 ## CRUD helpers (no SQL)
 
-For the boring cases, skip writing SQL - these build a parameterised statement
-for you (values bound, identifiers escaped). For anything past equality / `IN` /
-`NULL` conditions, drop back to raw `query`.
+For the boring cases, don't write SQL at all - these build a parameterised
+statement for you (values bound, identifiers escaped). The moment you need
+anything past equality / `IN` / `NULL` conditions, drop back to raw `query`.
 
 ```js
 // insert one row (or pass an array of objects for a bulk insert)
@@ -135,7 +135,7 @@ const player = await exports.vSQL.findOne('players', { id });
 ```
 
 The WHERE object ANDs its conditions; an array value becomes `IN (...)`, and
-`null` becomes `IS NULL`. Need `OR` or a comparison? Pass a raw escape hatch:
+`null` becomes `IS NULL`. Need `OR` or a comparison? There's a raw escape hatch:
 
 ```js
 const rich = await exports.vSQL.find('players', ['money > ? AND job = ?', [1000, 'police']]);
@@ -224,7 +224,8 @@ AddEventHandler('vSQL:ready', (server) => print('db up: ' + server.type));
 
 ### Probe the schema
 
-Handy for resources that self-migrate or adapt to an existing database:
+Handy when a resource migrates itself or has to adapt to a database it didn't
+create:
 
 ```js
 if (!(await exports.vSQL.tableExists('players'))) { /* create it */ }
