@@ -1,10 +1,11 @@
 # Compatibility with oxmysql / ghmattimysql / mysql-async
 
-vSQL can stand in for the common FiveM MySQL resources so existing scripts run
-unchanged. Set `vsql_compat true` (with the original resource removed) and vSQL
-answers their export namespaces. This document records exactly what is matched,
-the calling convention, and the deliberate differences - measured against
-**oxmysql 2.14.1** (`src/index.ts`, `src/compatibility/*`, `patches/*`).
+vSQL can stand in for the common FiveM MySQL resources so your existing scripts
+keep running untouched. Set `vsql_compat true` (with the original resource
+removed) and vSQL answers their export namespaces. This is the exhaustive
+reference - exactly what's matched, the calling convention, and the deliberate
+differences - all measured against **oxmysql 2.14.1** (`src/index.ts`,
+`src/compatibility/*`, `patches/*`).
 
 > Enable `vsql_compat` **only with the original resource removed.** Running both
 > `oxmysql` and vSQL-with-compat makes two resources fight over the same export
@@ -13,11 +14,11 @@ the calling convention, and the deliberate differences - measured against
 ## Export surface
 
 oxmysql exposes every method on its own namespace three ways - the bare name, a
-promise-returning `_async`, and a deprecated `Sync` alias (also promise-returning)
-- and answers a subset on the `ghmattimysql` and `mysql-async` namespaces. vSQL
-reproduces that surface. The mapping lives as plain data in
-[`src/compat-surface.ts`](src/compat-surface.ts) and is locked to this reference
-by `tests/compat-surface.test.ts`.
+promise-returning `_async`, and a deprecated (but still promise-returning) `Sync`
+alias - and answers a subset on the `ghmattimysql` and `mysql-async` namespaces.
+vSQL reproduces all of it. The mapping lives as plain data in
+[`src/compat-surface.ts`](src/compat-surface.ts) and is pinned to this reference
+by `tests/compat-surface.test.ts`, so the two can't drift apart.
 
 | Namespace | Exports |
 |---|---|
@@ -86,8 +87,8 @@ columns fall through to mysql2's default (a `Buffer`).
 ## On oxmysql's dependency patches
 
 oxmysql ships `.patch` files for `mysql2` and `named-placeholders`. vSQL does
-**not** patch its dependencies; it gets the important behaviours in its own code,
-which is more robust across driver upgrades.
+**not** patch its dependencies - it does the important behaviours in its own code,
+which holds up far better across driver upgrades.
 
 | oxmysql patch | What it does | vSQL equivalent |
 |---|---|---|
@@ -95,6 +96,6 @@ which is more robust across driver upgrades.
 | `mysql2` - `field.charset` + binary parser | Exposes charset to type-cast and returns binary as a byte array | Not reproduced (see type-casting above); needs a driver patch. |
 | `named-placeholders` - `@`/`:` names, quote-safety, missing -> null | Adds `@name` support, ignores placeholders inside quotes, binds missing named params to null | vSQL has its own placeholder parser (`src/params.ts`) that already supports `?`, `@name`, `:name`, skips string/identifier literals and comments, and expands arrays into `IN (...)` lists. The one difference: a missing named param throws (see above). |
 
-Because these behaviours live in vSQL's own parser rather than in patched
-`node_modules`, they survive `npm install` and mysql2 version bumps without a
-postinstall patch step.
+Because these behaviours live in vSQL's own parser instead of in patched
+`node_modules`, they survive `npm install` and mysql2 version bumps with no
+postinstall patch step to babysit.
