@@ -1,5 +1,7 @@
 # Brand assets
 
+Everything the project uses to present itself - what each file is for:
+
 | File | Use |
 |---|---|
 | `logo.svg` | Horizontal lockup (icon + wordmark). Used in the README header. |
@@ -11,8 +13,9 @@ Palette: ink `#0f172a`, accent gradient `#7dd3fc → #0891b2`, text `#e2e8f0`.
 
 ## Setting the GitHub social preview
 
-GitHub's social preview must be a **PNG/JPG** uploaded under
-**Settings → General → Social preview**. Export `social-card.svg` to PNG first, e.g.:
+GitHub's social preview has to be a **PNG/JPG**, uploaded under
+**Settings → General → Social preview**. So export `social-card.svg` to PNG
+first - either of these works:
 
 ```bash
 # with rsvg-convert (librsvg)
