@@ -1,14 +1,14 @@
 # Installation
 
-This page is the full, step-by-step setup. If you just want the three-line
-version, see [Getting started](/getting-started).
+The full, step-by-step setup. If you just want the three-line version, that's
+over in [Getting started](/getting-started).
 
-## Prerequisites
+## What you'll need
 
 | You need | Why |
 |---|---|
 | **FXServer** build 7290 or newer | vSQL targets the modern server scripting runtime. |
-| **MySQL 5.7+** or **MariaDB 10.4+** | The database itself. MariaDB 10.5+ additionally unlocks `RETURNING`. |
+| **MySQL 5.7+** or **MariaDB 10.4+** | The database itself. MariaDB 10.5+ also unlocks `RETURNING`. |
 | **Node.js 18+** | Only to *build* the resource from source. Not needed if you use a prebuilt release zip. |
 
 You do **not** need Node.js on the production server if you deploy a prebuilt
@@ -16,7 +16,7 @@ zip - FXServer runs the bundled `dist/index.js` directly.
 
 ## Step 1 - Get the resource
 
-Choose one:
+Two ways in. Pick one.
 
 ### Option A - Prebuilt release (recommended)
 
@@ -37,14 +37,14 @@ npm run build      # bundles src/ into dist/index.js + type declarations
 ```
 
 > `dist/` is generated, not committed. If you cloned the repo you **must** run
-> `npm run build` once before starting the server, or FXServer will fail to find
+> `npm run build` once before starting the server, or FXServer won't find
 > `dist/index.js`.
 
 ## Step 2 - Configure the connection
 
 Add the connection settings to your `server.cfg`. Use **either** a single
-connection string **or** discrete options - see [Configuration](/configuration)
-for every convar.
+connection string **or** the discrete options - [Configuration](/configuration)
+lists every convar.
 
 ```cfg
 # Option A: one connection string (URL or oxmysql-style key=value;)
@@ -65,23 +65,24 @@ ensure vSQL
 ensure my_other_resource   # anything that queries the DB comes after
 ```
 
-`ensure vSQL` must appear **before** any resource that calls it. Queries made
-before the pool is up don't fail - they queue on [`whenReady()`](/architecture#design-choices)
-and resolve once connected - but ordering still keeps your startup logs clean.
+`ensure vSQL` has to appear **before** any resource that calls it. Queries made
+before the pool is up don't fail - they queue on
+[`whenReady()`](/architecture#design-choices) and resolve once connected - but
+ordering things correctly still keeps your startup logs clean.
 
-## Step 4 - Verify
+## Step 4 - Check it came up
 
 Start the server and watch the console. On success vSQL prints a status box with
-the detected server and version:
+the detected server and version. To confirm any time after:
 
 ```
 vsql              # print profiler stats / confirm it's up
 vsql debug        # full (password-redacted) diagnostics dump
 ```
 
-If the pool can't connect, vSQL logs the attempt, an actionable hint (wrong
-host, access denied, unknown database, ...), and retries with backoff - it won't
-crash the server.
+If the pool can't connect, vSQL logs the attempt, a pointed hint (wrong host,
+access denied, unknown database, and so on), and retries with backoff - it won't
+take the server down with it.
 
 ## Using vSQL from another resource
 
@@ -122,22 +123,22 @@ const player = await db.findOne<Player>('players', { id });
 
 ## Updating
 
-- **Prebuilt:** replace the folder with the new release zip.
+- **Prebuilt:** swap the folder for the new release zip.
 - **From source:** `git pull && npm install && npm run build`, then restart the
   resource.
 
-vSQL checks GitHub for a newer release on startup (disable with
+vSQL checks GitHub for a newer release on startup (turn it off with
 `set vsql_version_check false`).
 
-## Migrating from oxmysql
+## Coming from oxmysql
 
-vSQL accepts oxmysql's `mysql_connection_string` format and exports the same
-methods, so most servers swap the resource and rename the connection convar. For
-a zero-edit transition, enable [compatibility mode](/compatibility) and keep
-your existing `exports.oxmysql.*` call sites. Remove the old resource first so
-two resources don't fight over the same export namespace.
+vSQL reads oxmysql's `mysql_connection_string` format and exports the same
+methods, so most servers just swap the resource and rename the connection convar.
+For a zero-edit move, enable [compatibility mode](/compatibility) and keep your
+existing `exports.oxmysql.*` call sites as they are. Remove the old resource
+first, though, so two resources don't fight over the same export namespace.
 
-## Troubleshooting
+## When something's off
 
 | Symptom | Likely cause |
 |---|---|
@@ -147,4 +148,4 @@ two resources don't fight over the same export namespace.
 | `Unknown database` | `vsql_database` doesn't exist yet - create the schema first. |
 | Another resource errors with "oxmysql not found" | Enable `vsql_compat` (see [Compatibility](/compatibility)). |
 
-Still stuck? `vsql debug` prints everything (redacted) needed for a bug report.
+Still stuck? `vsql debug` prints everything (redacted) you'd want in a bug report.
