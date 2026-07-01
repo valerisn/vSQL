@@ -146,7 +146,7 @@ export function registerCommands(): void {
               logger.info('profiler stats reset');
               break;
             default:
-              logger.warn(`unknown subcommand "${cmd}". try: vsql | vsql top | vsql resources | vsql debug | vsql migrate[:status|:rollback|:dry] | vsql cache clear`);
+              logger.warn(`unknown subcommand "${cmd}". try: vsql | vsql top | vsql resources | vsql debug | vsql migrate[:status|:rollback|:dry] | vsql cache clear | vsql reset`);
           }
         } catch (err: any) {
           logger.error(err.message);
