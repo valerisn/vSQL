@@ -25,4 +25,5 @@
 
 ## Notes for reviewers
 
-<!-- Anything that needs extra attention, context, or follow up. -->
+<!-- Anything that needs extra attention, context, or a follow-up later. -->
+

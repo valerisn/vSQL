@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-vSQL is under active development. Security fixes are applied to the latest release on the `main` branch. Please make sure you are running the latest version before reporting an issue.
+vSQL is under active development. Security fixes land on the latest release on the `main` branch, so please update to the latest version before reporting an issue - your bug may already be fixed.
 
 | Version | Supported |
 |---|---|
@@ -20,7 +20,7 @@ Report privately using GitHub's built in vulnerability reporting:
 2. Click **Report a vulnerability**.
 3. Fill in the advisory form with as much detail as you can.
 
-If you cannot use that flow, open a regular issue that contains **no technical details**, just asking a maintainer to get in touch about a security matter, and we will arrange a private channel.
+If that flow isn't available to you, open a regular issue with **no technical details** - just ask a maintainer to reach out about a security matter, and we'll set up a private channel.
 
 ### What to include
 
@@ -31,13 +31,13 @@ If you cannot use that flow, open a regular issue that contains **no technical d
 
 ### What to expect
 
-- We will acknowledge your report as soon as we can.
-- We will investigate, confirm the issue, and keep you updated on progress.
-- Once a fix is released, we are happy to credit you in the advisory unless you prefer to stay anonymous.
+- We'll acknowledge your report as soon as we can.
+- We'll investigate, confirm the issue, and keep you posted as it progresses.
+- Once a fix ships, we're glad to credit you in the advisory - unless you'd rather stay anonymous.
 
 ## Scope and good practices
 
-vSQL binds every query value through parameters, so untrusted input passed via the parameter argument is not vulnerable to SQL injection. Note that this protection only applies to **values**. Building SQL by concatenating untrusted input into the query string itself bypasses it.
+vSQL binds every query value through a parameter, so untrusted input passed as a parameter can't be used for SQL injection. That protection covers **values only**. Concatenating untrusted input straight into the query string sidesteps it entirely.
 
 > [!WARNING]
 > Never interpolate user supplied data directly into a SQL string. Always pass it through `?`, `@name`, or `:name` parameters.
