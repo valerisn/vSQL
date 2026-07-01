@@ -23,8 +23,10 @@ function showProfiler(): void {
     `${C.cyan}[vSQL]${C.reset} profiler  (server: ${db.server.type} ${db.server.version}, up ${formatUptime(s.uptimeMs)})`
   );
   logger.raw(`  queries: ${s.count}   errors: ${s.errors}   cache hits: ${s.cacheHits}   cache size: ${s.cacheSize}`);
-  const sat = s.peakInFlight > s.poolSize ? `${C.yellow}` : '';
-  logger.raw(`  in flight: ${s.inFlight}   peak: ${sat}${s.peakInFlight}${C.reset} / pool ${s.poolSize}${s.peakInFlight > s.poolSize ? `  ${C.yellow}(saturated - queries queued for a connection)${C.reset}` : ''}`);
+  const saturated = s.peakInFlight > s.poolSize;
+  const peak = saturated ? `${C.yellow}${s.peakInFlight}${C.reset}` : `${s.peakInFlight}`;
+  const flag = saturated ? `  ${C.yellow}(saturated - queries queued for a connection)${C.reset}` : '';
+  logger.raw(`  in flight: ${s.inFlight}   peak: ${peak} / pool ${s.poolSize}${flag}`);
   logger.raw(
     `  latency: avg ${s.avgMs.toFixed(1)}ms   p50 ${s.p50.toFixed(1)}ms   ` +
       `p95 ${s.p95.toFixed(1)}ms   p99 ${s.p99.toFixed(1)}ms`
