@@ -1,7 +1,6 @@
-// A simple readiness gate. Callers await whenReady() and are released the moment
-// the gate opens, so queries issued during startup - or while a reconnect is in
-// flight - queue instead of failing, and resolve as soon as the pool is back.
-// Kept dependency-free so the queue/release behaviour can be tested directly.
+// A readiness gate: callers await whenReady() and are released when it opens, so
+// queries during startup or a reconnect queue instead of failing. Dependency-free
+// so the queue/release behaviour can be tested on its own.
 interface Waiter {
   resolve: () => void;
   reject: (err: any) => void;
@@ -33,9 +32,8 @@ export class ReadyGate {
     this.ready = false;
   }
 
-  // Reject everyone currently waiting (used when the circuit breaker trips, so a
-  // hard-down database fails callers fast instead of hanging them). The gate stays
-  // closed; later callers queue again until it opens.
+  // Reject everyone waiting (when the breaker trips, so a hard-down DB fails fast
+  // instead of hanging). The gate stays closed; later callers queue again.
   fail(err: any): void {
     const pending = this.waiters;
     this.waiters = [];

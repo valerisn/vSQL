@@ -9,24 +9,15 @@ import {
   MYSQL_ASYNC_ALIASES
 } from './compat-surface';
 
-// Crossover compatibility for resources written against other MySQL resources.
+// Let resources written against oxmysql / ghmattimysql / mysql-async run on vSQL
+// unchanged. FiveM implements `exports.<resource>.<method>(...)` as an event,
+// `__cfx_export_<resource>_<method>`, that the owning resource answers with a
+// setter; we answer those events ourselves, reproducing oxmysql 2.14.1's surface.
 //
-// FiveM implements `exports.<resource>.<method>(...)` as an event named
-// `__cfx_export_<resource>_<method>`; the owning resource answers it with a
-// setter that hands back the function. We answer those events for oxmysql,
-// ghmattimysql and mysql-async ourselves, reproducing oxmysql 2.14.1's export
-// surface and calling convention so scripts that call `exports.oxmysql.execute(...)`
-// (etc.) route into vSQL unchanged.
-//
-// The convention we mirror: a base export is `(query, parameters, cb,
-// invokingResource = GetInvokingResource(), isPromise?)`. The trailing
-// invokingResource lets a wrapper resource forward the real caller for
-// attribution; isPromise is oxmysql-internal and ignored here. The `_async` /
-// `Sync` variants are `(query, parameters, invokingResource?)` and always return
-// a promise.
-//
-// Opt-in via `vsql_compat` and only with the original resource removed, so two
-// resources aren't both claiming the same export namespace.
+// The base export's shape is `(query, parameters, cb, invokingResource, isPromise)`:
+// the trailing invokingResource lets a wrapper forward the real caller, isPromise
+// is oxmysql-internal and ignored. The `_async`/`Sync` variants drop cb and always
+// return a promise. Opt-in via vsql_compat, and only with the original removed.
 
 type AnyFn = (...args: any[]) => any;
 
@@ -48,8 +39,8 @@ function bridge(promise: Promise<any>, cb?: any): Promise<any> | void {
   return promise;
 }
 
-// Attribution: an explicit invokingResource argument (a wrapper forwarding the
-// real caller) wins; otherwise read it from the current export call.
+// An explicit invokingResource arg (a wrapper forwarding the real caller) wins;
+// otherwise read it from the current export call.
 function resolveResource(explicit?: unknown): string | undefined {
   return (typeof explicit === 'string' && explicit) || invokingResource();
 }
@@ -73,9 +64,8 @@ function dbForward(method: string): Handler {
   };
 }
 
-// store: oxmysql's store is a pass-through that returns the query as-is (it never
-// actually caches), so resources that call store() then pass the result back as
-// their query keep working.
+// oxmysql's store never really caches - it just returns the query. Mirror that,
+// so resources that call store() and pass the result back as their query work.
 const storeHandler: Handler = {
   base: (query: string, cb?: any) => {
     if (typeof cb === 'function') {

@@ -1,12 +1,9 @@
-// The transaction-with-retry control flow, lifted out of Database so it can be
-// exercised without a live pool. It runs a unit of work inside a single
-// transaction on one acquired connection and, when the error is judged
-// retryable (InnoDB deadlock / lock-wait timeout), rolls back and replays the
-// whole unit on a fresh connection up to `attempts` times.
-//
-// Replaying is safe for the database because each attempt is rolled back whole
-// before the next; a callback-form unit with side effects *outside* the DB will
-// still see those repeated, which is the caller's contract to keep idempotent.
+// The transaction-with-retry loop, lifted out of Database so it runs without a
+// live pool. It runs a unit of work in one transaction on one connection and, on
+// a retryable error (InnoDB deadlock / lock-wait timeout), rolls back and replays
+// the whole unit on a fresh connection up to `attempts` times. Safe for the DB
+// since each attempt rolls back whole first - but side effects *outside* the DB
+// repeat, so a callback unit is the caller's job to keep idempotent.
 
 /** The slice of a pooled connection the retry loop drives. */
 export interface AtomicConn {
@@ -63,7 +60,6 @@ export async function runAtomic<T, C extends AtomicConn>(opts: RunAtomicOptions<
       if (release) conn.release();
     }
   }
-  // Unreachable in practice (the loop either returns or throws), but keeps the
-  // function total if attempts somehow falls through.
+  // Unreachable - the loop always returns or throws - but keeps TS happy.
   throw lastErr;
 }

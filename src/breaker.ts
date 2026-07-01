@@ -1,14 +1,9 @@
-// A small circuit breaker for the connection lifecycle. Normally vSQL queues
-// callers on whenReady() until the pool connects - great for startup and brief
-// blips. But if the database is *hard* down, that queue grows without bound and
-// every dependent resource hangs. The breaker bounds that: after `threshold`
-// consecutive connection failures it "opens", and while open the gate fast-fails
-// callers with a clear error instead of queueing them. After `resetMs` it goes
-// half-open (one probe is allowed to queue again); a success closes it, another
-// failure re-opens it.
-//
-// Pure and clock-injectable, so the state transitions are testable without
-// timers. Disabled when threshold is 0.
+// A circuit breaker for the connection lifecycle. Queueing on whenReady() is
+// right for startup and brief blips, but if the DB is *hard* down that queue
+// grows forever and every dependent resource hangs. So after `threshold`
+// consecutive failures the breaker opens and callers fast-fail instead; after
+// `resetMs` it goes half-open to let one probe through, and a success closes it.
+// Clock-injectable so the transitions are testable without real timers.
 export type BreakerState = 'closed' | 'open' | 'half-open';
 
 export class CircuitBreaker {
