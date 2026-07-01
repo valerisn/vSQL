@@ -1,12 +1,13 @@
 # Configuration
 
-Everything vSQL reads is a FiveM **convar** set in `server.cfg`. Nothing here is
-required beyond the connection itself - every option has a sensible default.
+Everything vSQL reads is a FiveM **convar** in `server.cfg`. The only thing you
+have to set is how to reach the database - every other option ships with a
+sensible default, so add convars only when you want to change something.
 
 ## Connecting
 
-You can point vSQL at the database two ways. A connection string wins if both
-are set.
+There are two ways to point vSQL at the database. If you set both, the
+connection string wins.
 
 ### Connection string
 
@@ -31,8 +32,8 @@ set vsql_socket "/var/run/mysqld/mysqld.sock"
 ```
 
 ::: tip
-No `vsql_database`? vSQL still starts, but every query must fully-qualify table
-names (`schema.table`). It warns about this once on startup.
+No `vsql_database`? vSQL still starts, but every query then has to fully-qualify
+its table names (`schema.table`). It'll warn you about this once on startup.
 :::
 
 ## Full convar reference
@@ -99,9 +100,9 @@ names (`schema.table`). It warns about this once on startup.
 set vsql_replica_hosts "10.0.0.2,10.0.0.3:3307"
 ```
 
-A replica that errors with a connection failure is dropped from rotation for the
-cooldown and the read transparently falls back to the primary - a replica being
-down never blocks reads or trips the primary's reconnect.
+If a replica errors with a connection failure, it's dropped from rotation for the
+cooldown and the read quietly falls back to the primary - a replica going down
+never blocks reads or trips the primary's reconnect.
 
 ### Migrations
 
@@ -126,8 +127,8 @@ down never blocks reads or trips the primary's reconnect.
 
 ## Per-call options
 
-A few settings can be overridden for a single query by passing an options object
-as the last data argument (before any callback):
+A few settings can be overridden for one query at a time by passing an options
+object as the last data argument (before any callback):
 
 ```js
 // skip the result cache for this read even if caching is on globally
@@ -166,8 +167,9 @@ set vsql_slow_query_warning 50
 :::
 
 ::: warning
-Result caching is **opt-in and global**: any write clears the entire cache to
-stay correct. It helps read-heavy workloads with repeated identical reads, and
-hurts write-heavy ones. Measure before enabling it in production, and reach for
-`cacheClear("table")` for targeted invalidation.
+Result caching is **opt-in and global**: any write clears the entire cache so you
+never read stale data. It pays off on read-heavy workloads with repeated
+identical reads, and costs you on write-heavy ones. Measure before switching it on
+in production, and reach for `cacheClear("table")` when you want targeted
+invalidation.
 :::
