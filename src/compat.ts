@@ -1,13 +1,13 @@
 import { db } from './database';
 import { config } from './config';
 import { logger } from './logger';
-import { invokingResource } from './invoker';
+import { invokingResource } from './lib/invoker';
 import {
   COMPAT_METHODS,
   CompatMethod,
   GHMATTI_ALIASES,
   MYSQL_ASYNC_ALIASES
-} from './compat-surface';
+} from './lib/compat-surface';
 
 // Let resources written against oxmysql / ghmattimysql / mysql-async run on vSQL
 // unchanged. FiveM implements `exports.<resource>.<method>(...)` as an event,

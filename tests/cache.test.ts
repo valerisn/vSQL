@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ResultCache } from '../src/cache.ts';
+import { ResultCache } from '../src/lib/cache.ts';
 
 function freshCache(max = 100, ttl = 1000): ResultCache {
   const c = new ResultCache();

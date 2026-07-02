@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { bindParams, clearPlanCache } from '../src/params.ts';
+import { bindParams, clearPlanCache } from '../src/lib/params.ts';
 
 test('positional placeholders bind in order', () => {
   const { sql, values } = bindParams('SELECT * FROM t WHERE a = ? AND b = ?', [1, 'x']);

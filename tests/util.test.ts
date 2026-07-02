@@ -11,7 +11,7 @@ import {
   isRetryableError,
   preview,
   withStatementTimeout
-} from '../src/util.ts';
+} from '../src/lib/util.ts';
 
 test('isReadQuery recognises read statements (incl. leading comments/parens)', () => {
   for (const sql of [

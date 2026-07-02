@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import mysql from 'mysql2/promise';
-import { bindParams } from '../../src/params.ts';
-import { asAffected, asInsertId, asScalar, asSingle } from '../../src/shape.ts';
-import { runAtomic } from '../../src/retry.ts';
+import { bindParams } from '../../src/lib/params.ts';
+import { asAffected, asInsertId, asScalar, asSingle } from '../../src/lib/shape.ts';
+import { runAtomic } from '../../src/lib/retry.ts';
 
 // Integration coverage for the importable query logic - the param parser, the
 // result-shape helpers, and the transaction retry loop - against a *real*

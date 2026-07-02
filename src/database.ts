@@ -2,12 +2,12 @@ import { performance } from 'perf_hooks';
 import mysql, { Pool, PoolConnection } from 'mysql2/promise';
 import { config } from './config';
 import { logger } from './logger';
-import { bindParams, Params } from './params';
-import { ResultCache } from './cache';
-import { Profiler, ProfilerStats } from './profiler';
+import { bindParams, Params } from './lib/params';
+import { ResultCache } from './lib/cache';
+import { Profiler, ProfilerStats } from './lib/profiler';
 import { detectServer, ServerInfo } from './server';
 import { printReady } from './banner';
-import { asAffected, asInsertId, asScalar, asSingle, normalizeEntry, TransactionEntry } from './shape';
+import { asAffected, asInsertId, asScalar, asSingle, normalizeEntry, TransactionEntry } from './lib/shape';
 import {
   ColumnInfo,
   shapeColumns,
@@ -16,8 +16,8 @@ import {
   SQL_LIST_COLUMNS,
   SQL_LIST_TABLES,
   SQL_TABLE_EXISTS
-} from './schema';
-import { castValue } from './typecast';
+} from './lib/schema';
+import { castValue } from './lib/typecast';
 import {
   buildDelete,
   buildInsert,
@@ -27,11 +27,11 @@ import {
   buildUpdate,
   FindOptions,
   Where
-} from './crud';
-import { runAtomic } from './retry';
-import { ReadyGate } from './gate';
-import { CircuitBreaker } from './breaker';
-import { ReplicaSet, ReplicaStatus } from './replicas';
+} from './lib/crud';
+import { runAtomic } from './lib/retry';
+import { ReadyGate } from './lib/gate';
+import { CircuitBreaker } from './lib/breaker';
+import { ReplicaSet, ReplicaStatus } from './lib/replicas';
 import {
   backoff,
   connectionHint,
@@ -43,7 +43,7 @@ import {
   preview,
   sleep,
   withStatementTimeout
-} from './util';
+} from './lib/util';
 
 type Mode = 'query' | 'execute';
 

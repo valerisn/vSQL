@@ -1,6 +1,6 @@
 import { db } from './database';
 import { logger } from './logger';
-import { invokingResource } from './invoker';
+import { invokingResource } from './lib/invoker';
 
 type Callback = (result: any, error?: any) => void;
 

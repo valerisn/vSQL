@@ -1,6 +1,6 @@
 import type { PoolOptions } from 'mysql2/promise';
 import type { ServerInfo } from './server';
-import { castValue } from './typecast';
+import { castValue } from './lib/typecast';
 
 export type ServerHint = 'auto' | 'mysql' | 'mariadb';
 

@@ -8,7 +8,7 @@ import {
   buildSelectById,
   buildUpdate,
   escapeId
-} from '../src/crud.ts';
+} from '../src/lib/crud.ts';
 
 test('escapeId backtick-wraps and doubles internal backticks', () => {
   assert.equal(escapeId('players'), '`players`');

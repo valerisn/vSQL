@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { runAtomic } from '../src/retry.ts';
-import type { AtomicConn } from '../src/retry.ts';
+import { runAtomic } from '../src/lib/retry.ts';
+import type { AtomicConn } from '../src/lib/retry.ts';
 
 // A fake pooled connection that records every lifecycle call, so each test can
 // assert exactly what the retry loop did to it.

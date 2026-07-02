@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { asAffected, asInsertId, asScalar, asSingle, normalizeEntry } from '../src/shape.ts';
+import { asAffected, asInsertId, asScalar, asSingle, normalizeEntry } from '../src/lib/shape.ts';
 
 test('single() returns the first row, or null on an empty result set', () => {
   assert.deepEqual(asSingle([{ id: 1 }, { id: 2 }]), { id: 1 });

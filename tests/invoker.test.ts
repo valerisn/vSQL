@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { invokingResource } from '../src/invoker.ts';
+import { invokingResource } from '../src/lib/invoker.ts';
 
 test('returns undefined off the FXServer runtime (no GetInvokingResource native)', () => {
   // The native isn't defined under node --test, so attribution is best-effort.

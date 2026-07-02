@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ReplicaSet } from '../src/replicas.ts';
+import { ReplicaSet } from '../src/lib/replicas.ts';
 
 function clock(start = 1000) {
   const c = { t: start, now: () => c.t };

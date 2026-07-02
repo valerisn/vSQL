@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CircuitBreaker } from '../src/breaker.ts';
+import { CircuitBreaker } from '../src/lib/breaker.ts';
 
 // A mutable clock so we can drive the cooldown deterministically.
 function clock(start = 0) {

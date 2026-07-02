@@ -7,7 +7,7 @@ import {
   ghmattiExports,
   mysqlAsyncExports,
   oxmysqlExports
-} from '../src/compat-surface.ts';
+} from '../src/lib/compat-surface.ts';
 
 // These expectations are transcribed directly from oxmysql 2.14.1's source
 // (src/index.ts + src/compatibility/*). They lock vSQL's claimed export surface

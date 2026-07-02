@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { shapeColumns, shapeTables } from '../src/schema.ts';
+import { shapeColumns, shapeTables } from '../src/lib/schema.ts';
 
 test('shapeColumns maps information_schema rows to a clean shape', () => {
   const rows = [

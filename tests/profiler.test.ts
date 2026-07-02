@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Profiler, normalizeShape } from '../src/profiler.ts';
+import { Profiler, normalizeShape } from '../src/lib/profiler.ts';
 
 test('counts every recorded query and tracks errors / cache hits', () => {
   const p = new Profiler();

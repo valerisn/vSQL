@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { castValue } from '../src/typecast.ts';
+import { castValue } from '../src/lib/typecast.ts';
 
 // Minimal stand-in for mysql2's TypeCastField. Only the bits castValue reads.
 function field(opts: { type: string; length?: number; string?: string | null; buffer?: number[] | null }): any {
