@@ -5,7 +5,7 @@
 // Both resources wrap mysql2, so once a query reaches the driver the cost is
 // identical - the meaningful pure-JS difference is the per-call parameter
 // parsing that runs on every single query. This pits vSQL's bindParams
-// (src/params.ts) against a faithful reproduction of oxmysql 2.14.1's
+// (src/lib/params.ts) against a faithful reproduction of oxmysql 2.14.1's
 // parseArguments (src/utils/parseArguments.ts, transcribed below with its NULL
 // padding and `?`-count logic intact).
 //
