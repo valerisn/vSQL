@@ -19,7 +19,7 @@
 // Requires Node 24+ (native TypeScript type stripping, same as the test suite).
 
 import { createRequire } from 'node:module';
-import { bindParams } from '../src/params.ts';
+import { bindParams } from '../src/lib/params.ts';
 
 const require = createRequire(import.meta.url);
 

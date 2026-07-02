@@ -6,10 +6,10 @@
 //
 // Requires Node 24+ (native TypeScript type stripping, same as the test suite).
 
-import { bindParams } from '../src/params.ts';
-import { isReadQuery } from '../src/util.ts';
-import { normalizeShape } from '../src/profiler.ts';
-import { ResultCache } from '../src/cache.ts';
+import { bindParams } from '../src/lib/params.ts';
+import { isReadQuery } from '../src/lib/util.ts';
+import { normalizeShape } from '../src/lib/profiler.ts';
+import { ResultCache } from '../src/lib/cache.ts';
 
 function bench(name, fn, iterations = 1_000_000) {
   // Warm up so the JIT has compiled the hot path before we measure.

@@ -12,8 +12,8 @@
 //
 // Requires Node 24+ (native TypeScript type stripping).
 
-import { isReadQuery, isLockingRead, isCacheable, isCacheableRead } from '../src/util.ts';
-import { ResultCache } from '../src/cache.ts';
+import { isReadQuery, isLockingRead, isCacheable, isCacheableRead } from '../src/lib/util.ts';
+import { ResultCache } from '../src/lib/cache.ts';
 
 function bench(name, fn, iterations = 2_000_000) {
   for (let i = 0; i < 20_000; i++) fn(i); // warm
