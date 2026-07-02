@@ -196,22 +196,22 @@ export class Profiler {
     if (resource) this.resourceAgg(resource).count++;
   }
 
-  private percentile(p: number): number {
-    if (this.samples.length === 0) return 0;
-    const sorted = [...this.samples].sort((a, b) => a - b);
-    const idx = Math.min(sorted.length - 1, Math.floor((p / 100) * sorted.length));
-    return sorted[idx];
-  }
-
   stats(): ProfilerStats {
+    // Sort the sample window once and read all three percentiles off it, rather
+    // than re-sorting per percentile - stats() can be polled on an interval.
+    const sorted = [...this.samples].sort((a, b) => a - b);
+    const pct = (p: number): number => {
+      if (sorted.length === 0) return 0;
+      return sorted[Math.min(sorted.length - 1, Math.floor((p / 100) * sorted.length))];
+    };
     return {
       count: this.count,
       errors: this.errors,
       cacheHits: this.cacheHits,
       avgMs: this.count ? this.totalMs / this.count : 0,
-      p50: this.percentile(50),
-      p95: this.percentile(95),
-      p99: this.percentile(99),
+      p50: pct(50),
+      p95: pct(95),
+      p99: pct(99),
       slow: [...this.slow].reverse().slice(0, 10),
       byResource: this.byResource(20),
       inFlight: this.inFlight,
