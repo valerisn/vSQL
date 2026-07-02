@@ -117,7 +117,8 @@ export function registerExports(): void {
       cb = optsOrCb;
       optsOrCb = undefined;
     }
-    return bridge(db.whenReady().then(() => db.find(table, where, optsOrCb)), cb);
+    // optsOrCb is the FindOptions; withResource() carries only the caller for profiling.
+    return bridge(db.whenReady().then(() => db.find(table, where, optsOrCb, withResource())), cb);
   });
   exports('findOne', (table: string, where?: any, optsOrCb?: any, cb?: any) => {
     if (typeof where === 'function') {
@@ -127,7 +128,7 @@ export function registerExports(): void {
       cb = optsOrCb;
       optsOrCb = undefined;
     }
-    return bridge(db.whenReady().then(() => db.findOne(table, where, optsOrCb)), cb);
+    return bridge(db.whenReady().then(() => db.findOne(table, where, optsOrCb, withResource())), cb);
   });
 
   // Schema introspection.

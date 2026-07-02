@@ -481,14 +481,17 @@ class Database {
     return this.update(q.sql, q.values, opts);
   }
 
-  find(table: string, where?: Where, opts?: FindOptions): Promise<any[]> {
+  // queryOpts carries the invoking resource (set by the export layer) so finds are
+  // attributed in the profiler like every other CRUD helper; FindOptions stays the
+  // public shaping arg.
+  find(table: string, where?: Where, opts?: FindOptions, queryOpts?: QueryOptions): Promise<any[]> {
     const q = buildSelect(table, where, opts);
-    return this.query(q.sql, q.values);
+    return this.query(q.sql, q.values, queryOpts);
   }
 
-  findOne(table: string, where?: Where, opts?: FindOptions): Promise<any> {
+  findOne(table: string, where?: Where, opts?: FindOptions, queryOpts?: QueryOptions): Promise<any> {
     const q = buildSelect(table, where, { ...opts, limit: 1 });
-    return this.single(q.sql, q.values);
+    return this.single(q.sql, q.values, queryOpts);
   }
 
   // An array of arrays runs the statement once per row in a transaction (batch);
