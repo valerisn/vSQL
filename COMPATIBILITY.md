@@ -17,7 +17,7 @@ oxmysql exposes every method on its own namespace three ways - the bare name, a
 promise-returning `_async`, and a deprecated (but still promise-returning) `Sync`
 alias - and answers a subset on the `ghmattimysql` and `mysql-async` namespaces.
 vSQL reproduces all of it. The mapping lives as plain data in
-[`src/compat-surface.ts`](src/compat-surface.ts) and is pinned to this reference
+[`src/lib/compat-surface.ts`](src/lib/compat-surface.ts) and is pinned to this reference
 by `tests/compat-surface.test.ts`, so the two can't drift apart.
 
 | Namespace | Exports |
@@ -92,9 +92,9 @@ which holds up far better across driver upgrades.
 
 | oxmysql patch | What it does | vSQL equivalent |
 |---|---|---|
-| `mysql2` - bind `undefined` | Coerces `undefined` bind values to `NULL` instead of throwing | vSQL's param binder coerces `undefined` -> `NULL` at every binding point (`src/params.ts`). |
+| `mysql2` - bind `undefined` | Coerces `undefined` bind values to `NULL` instead of throwing | vSQL's param binder coerces `undefined` -> `NULL` at every binding point (`src/lib/params.ts`). |
 | `mysql2` - `field.charset` + binary parser | Exposes charset to type-cast and returns binary as a byte array | Not reproduced (see type-casting above); needs a driver patch. |
-| `named-placeholders` - `@`/`:` names, quote-safety, missing -> null | Adds `@name` support, ignores placeholders inside quotes, binds missing named params to null | vSQL has its own placeholder parser (`src/params.ts`) that already supports `?`, `@name`, `:name`, skips string/identifier literals and comments, and expands arrays into `IN (...)` lists. The one difference: a missing named param throws (see above). |
+| `named-placeholders` - `@`/`:` names, quote-safety, missing -> null | Adds `@name` support, ignores placeholders inside quotes, binds missing named params to null | vSQL has its own placeholder parser (`src/lib/params.ts`) that already supports `?`, `@name`, `:name`, skips string/identifier literals and comments, and expands arrays into `IN (...)` lists. The one difference: a missing named param throws (see above). |
 
 Because these behaviours live in vSQL's own parser instead of in patched
 `node_modules`, they survive `npm install` and mysql2 version bumps with no

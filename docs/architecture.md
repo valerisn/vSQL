@@ -72,24 +72,28 @@ Callers that were in flight wait on the gate and pick back up on
 
 ## Modules
 
+The runtime wiring lives at the `src/` root; the pure helpers that don't touch
+FiveM natives (and so can be unit-tested with `node --test` in isolation) live
+under `src/lib/`.
+
 | Module | Responsibility |
 |---|---|
 | `index.ts` | Bootstrap: load config, register exports/commands/compat, print banner, start the pool, run migrations, wire `onResourceStop`. |
 | `config.ts` | Parse convars (URL / semicolon / discrete), build `PoolOptions`, session statements, redacted summary, validation warnings. |
 | `exports.ts` | Register FiveM exports; bridge Promise ↔ callback; normalise `(sql, params?, opts?, cb?)`; capture the invoking resource. |
 | `database.ts` | The pool, connection lifecycle (connect / reconnect / drain), the query API, cache wiring, slow-query logging. |
-| `gate.ts` | The readiness gate - queue callers while the pool is down, release them on connect. |
-| `params.ts` | Placeholder binding - `?`, `@name`, `:name`, `IN (?)` expansion - with a memoised per-SQL plan. Always bound, never interpolated. |
-| `retry.ts` | The transaction-with-retry loop: run in a transaction, roll back and replay on deadlock / lock-wait. |
-| `breaker.ts` | Circuit breaker - fast-fail callers when the database is hard-down instead of queueing forever. |
-| `replicas.ts` | Health-aware, round-robin set of read replicas with failover to the primary. |
-| `crud.ts` | Safe SQL builders for the CRUD helpers - values bound, identifiers escaped. |
-| `schema.ts` | Schema introspection queries + row shaping (tableExists / columns / ...). |
-| `shape.ts` | Pure result shaping (`single` / `scalar` / `insert` / `update`) and transaction-entry normalisation. |
-| `cache.ts` | TTL + LRU result cache with substring invalidation. |
-| `profiler.ts` | Counters, latency ring buffer + percentiles, slow-query log, per-shape and per-resource aggregation. |
-| `util.ts` | Pure helpers: read/write classification, cacheability, backoff, fatal/retryable error detection, connection hints, statement-timeout wrapping. |
-| `typecast.ts` | Opt-in oxmysql-compatible result casting (dates → ms, `TINYINT(1)` / `BIT(1)` → bool). |
+| `lib/gate.ts` | The readiness gate - queue callers while the pool is down, release them on connect. |
+| `lib/params.ts` | Placeholder binding - `?`, `@name`, `:name`, `IN (?)` expansion - with a memoised per-SQL plan. Always bound, never interpolated. |
+| `lib/retry.ts` | The transaction-with-retry loop: run in a transaction, roll back and replay on deadlock / lock-wait. |
+| `lib/breaker.ts` | Circuit breaker - fast-fail callers when the database is hard-down instead of queueing forever. |
+| `lib/replicas.ts` | Health-aware, round-robin set of read replicas with failover to the primary. |
+| `lib/crud.ts` | Safe SQL builders for the CRUD helpers - values bound, identifiers escaped. |
+| `lib/schema.ts` | Schema introspection queries + row shaping (tableExists / columns / ...). |
+| `lib/shape.ts` | Pure result shaping (`single` / `scalar` / `insert` / `update`) and transaction-entry normalisation. |
+| `lib/cache.ts` | TTL + LRU result cache with substring invalidation. |
+| `lib/profiler.ts` | Counters, latency ring buffer + percentiles, slow-query log, per-shape and per-resource aggregation. |
+| `lib/util.ts` | Pure helpers: read/write classification, cacheability, backoff, fatal/retryable error detection, connection hints, statement-timeout wrapping. |
+| `lib/typecast.ts` | Opt-in oxmysql-compatible result casting (dates → ms, `TINYINT(1)` / `BIT(1)` → bool). |
 | `compat.ts` | Claim the oxmysql / ghmattimysql / mysql-async export namespaces and route them in. |
 | `server.ts` | Detect MySQL vs MariaDB and `RETURNING` support. |
 | `migrations.ts` | Discover, checksum, lock, apply / rollback / status. |

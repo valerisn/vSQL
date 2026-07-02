@@ -358,11 +358,15 @@ vSQL/
 │   ├── index.ts            # bootstrap / lifecycle
 │   ├── config.ts           # convar parsing
 │   ├── database.ts         # pool, query API, transactions
-│   ├── params.ts           # placeholder binding
 │   ├── migrations.ts       # migration runner
 │   ├── exports.ts          # FiveM export registration
 │   ├── commands.ts         # vsql console command
-│   ├── profiler.ts / cache.ts / logger.ts / server.ts / util.ts
+│   ├── logger.ts / server.ts / version.ts / banner.ts
+│   ├── lib/                # pure, unit-tested helpers (no FiveM natives)
+│   │   ├── params.ts       # placeholder binding
+│   │   ├── crud.ts         # safe SQL builders
+│   │   ├── profiler.ts / cache.ts / util.ts / retry.ts / ...
+│   │   └── breaker.ts / gate.ts / replicas.ts / shape.ts / ...
 │   └── fivem.d.ts
 └── dist/                   # build output (index.js)
 ```
