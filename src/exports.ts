@@ -33,7 +33,7 @@ export function registerExports(): void {
         optsOrCb = undefined;
       }
       const userOpts = optsOrCb && typeof optsOrCb === 'object' ? optsOrCb : undefined;
-      const opts = userOpts || resource ? { ...userOpts, resource } : undefined;
+      const opts = (userOpts || resource) ? { ...userOpts, resource } : undefined;
       return bridge(db.whenReady().then(() => (db as any)[method](sql, params, opts)), cb);
     };
   };
